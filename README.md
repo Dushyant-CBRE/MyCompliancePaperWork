@@ -47,7 +47,67 @@ An intelligent document processing pipeline that:
 
 ---
 
-## RECOMMENDED TECHNOLOGY STACK
+
+
+## IMPLEMENTATION PHASES
+
+### Phase  Foundation  *parallel work*
+
+We would have a research hour (inidvidualy), and tru to find the best option of the technology we can use.
+Here are the option addording to me
+
+## TECHNOLOGY STACK (Detailed Comparison)
+
+**Integration Decision**:
+| Option | Pros | Cons | Chosen |
+|--------|------|------|--------|
+| Smartsheet Webhook | Real-time, no polling | Requires admin access |  Too risky |
+| API Polling (5min) | Simple, read-only | Slight delay | Fallback |
+| **Manual Upload UI** | Works without access, demo-friendly | Not "real" integration | Safest for demo |
+
+**Recommendation**: Build upload UI with "Imported from Smartsheet" label, explain webhook for production
+
+###  **1.Document OCR / Text Extraction**
+
+| Option | Layout Detection | Table Extraction | Handwriting | Cost | Setup | Recommendation |
+|--------|-----------------|------------------|-------------|------|-------|----------------|
+| **Azure Document Intelligence** | Excellent | Excellent | Yes | $1.50/1000 pages | Easy (API) | **Best** |
+| Tesseract OCR | Poor | No |  Fair | Free | Medium (local install) | If cost critical |
+| AWS Textract | Good | Good | Yes | $1.50/1000 pages | Easy (API) | If using AWS |
+| PyMuPDF + PyPDF2 | Basic | No | No | Free | Easy (pip install) | For text-only PDFs |
+| Google Document AI | Excellent | Excellent | Yes | $1.50/1000 pages | Easy (API) | If using GCP |
+
+**Chosen**: **Azure Document Intelligence** (Form Recognizer) - Best layout/table detection, same cloud as LLM
+
+**Free Tier**: 500 pages/month (sufficient for demo)
+
+
+###  **2.Backend Runtime / Compute**
+
+| Option | Complexity | Cost | Demo Reality | Learning Curve | Recommendation |
+|--------|-----------|------|--------------|----------------|----------------|
+| **Azure Functions (Python)** | Low | Free | High (live URL) | Low (just Python with decorators) |  **Best** |
+| FastAPI + Container Apps | Medium | $10/month | High (live URL) | Medium |  If team knows FastAPI |
+| Flask + App Service | Medium | $5/month | High (live URL) | Low |  If avoiding serverless |
+| Pure Python Script | Very Low | Free | Medium (run on laptop) | Very Low |  **Fastest for demo** |
+
+**Chosen**: **Azure Functions (Python 3.11)** - Serverless, auto-scale, free tier, minimal wrapper around Python
+
+### **3.LLM Models**
+
+| Model | Speed | Cost | Accuracy | JSON Mode | Context | Use Case | Recommendation |
+|-------|-------|------|----------|-----------|---------|----------|----------------|
+| **GPT-4o** | Fast (1-2s) | $2.50/1M tokens | Very Good | Excellent | 128k | Extraction, Validation | **Primary** |
+| GPT-4-turbo | Slower (3-5s) | $10/1M tokens | Excellent | Good | 128k | Remedial Detection | **Fallback** |
+
+### **4.Programming Language**
+
+| Language | Ecosystem | AI/ML Libraries | Azure Integration | Team Familiarity | Recommendation |
+|----------|-----------|-----------------|-------------------|------------------|----------------|
+| **Python 3.11** | Excellent | Best (openai, transformers, pandas) | Native support | High |  **Best** |
+
+---
+
 
 ### AI/ML Layer
 - **Primary LLM**: Azure OpenAI GPT-4o (extraction, validation) - Fast, cheap, good JSON mode
@@ -66,281 +126,76 @@ An intelligent document processing pipeline that:
 - **PDF Viewer**: react-pdf
 - **Hosting**: Azure Static Web Apps - Free tier with CI/CD
 
----
 
-## IMPLEMENTATION PHASES
-
-### Phase 1: Foundation (Hours 1-8) *parallel work*
 
 **Tasks**:
 1. Set up Azure resources — **Cloud Architect- Asif is checking that**
+2. Get Create sample documents — **Already have that** 
+3. Build Azure Function Skeleton Code — **Vikas and Vansh can check**
 
-   ### 5️⃣ **Document Storage (Files)**
+   Backend skeleton
 
-| Option | Cost | Access Speed | Scalability | Setup | Query Capability | Recommendation |
-|--------|------|--------------|-------------|-------|------------------|----------------|
-| **Azure Blob Storage** | $0.018/GB | Fast | Unlimited | Easy | By path only |  **Best for files** |
+```mermaid
+graph TD
+    %% External Sources
+    subgraph External_Sources [Sources & AI]
+        SS[Smartsheet PDF]
+        DI[Document Intelligence]
+        GPT[GPT-4o Agents]
+    end
 
-**Chosen**: **Azure Blob Storage** - Cheapest, simple, perfect for storing PDF/image files
+    %% Storage Layer
+    subgraph Storage [Storage Layer]
+        BS[(Blob Storage: Documents)]
+        QM(Queue Message)
+        TS[(Table Storage: Metadata)]
+    end
 
-### 6️⃣ **Metadata / Structured Data Storage**
+    %% Azure Functions (The Brain)
+    subgraph Azure_Functions [Azure Functions: Backend Brain]
+        AF1[AF1: Poller Timer]
+        AF2[AF2: Processor Queue]
+        AF3[AF3: API HTTP]
+    end
 
-| Option | Complexity | Cost | Query Speed | Relational | Schema | Setup | Recommendation |
-|--------|-----------|------|-------------|-----------|--------|-------|----------------|
-| **Azure Table Storage** | Low | $0.05/GB | Fast |  NoSQL | Flexible | Easy |  **Best for POC** |
-| Azure SQL Database | High | $5/month min | Very Fast | Yes | Rigid | Medium |  If need joins/complex queries |
+    %% Dashboard
+    RD[React Dashboard]
 
-**Chosen**: **Azure Table Storage** - Simple NoSQL, dirt cheap, sufficient for document metadata
+    %% Data Flow Connections
+    SS --> AF1
+    AF1 --> BS
+    AF1 --> QM
+    
+    QM --> AF2
+    AF2 <--> DI
+    AF2 <--> GPT
+    AF2 --> TS
+    
+    TS <--> AF3
+    AF3 <--> RD
 
-3. Get Create sample documents — **Already have that** 
-4. Build Azure Function scaffolding — **Vikas and Vansh can check**
-
-┌─────────────────────────────────────────────────────────┐
-│ AZURE FUNCTIONS = Your Backend Brain                    │
-└─────────────────────────────────────────────────────────┘
-
-Smartsheet          Azure Function 1           Blob Storage
-   PDF    ──────►   [Poller Timer]   ──────►   [Documents]
-                         │
-                         ▼
-                    Queue Message
-                         │
-                         ▼
-Document           Azure Function 2        Table Storage
-Intelligence  ◄── [Processor Queue]  ─►   [Metadata/Results]
-   +                     │
-GPT-4o                   │
-Agents                   ▼
-                   
-React              Azure Function 3        Table Storage
-Dashboard   ◄────  [API HTTP]      ◄────   [Read/Update]
-
-
+    %% Styling
+    style AF1 fill:#0078d4,color:#fff
+    style AF2 fill:#0078d4,color:#fff
+    style AF3 fill:#0078d4,color:#fff
+    style QM fill:#f9f,stroke:#333
+```
 
 
 
 5. Revision all existing models that are pretrained and we can use eg Azure Document Intelligence — **Dushyant**
-###  **Document OCR / Text Extraction**
-
-| Option | Layout Detection | Table Extraction | Handwriting | Cost | Setup | Recommendation |
-|--------|-----------------|------------------|-------------|------|-------|----------------|
-| **Azure Document Intelligence** | Excellent | Excellent | Yes | $1.50/1000 pages | Easy (API) | **Best** |
-| Tesseract OCR | Poor | No |  Fair | Free | Medium (local install) | If cost critical |
-| AWS Textract | Good | Good | Yes | $1.50/1000 pages | Easy (API) | If using AWS |
-| PyMuPDF + PyPDF2 | Basic | No | No | Free | Easy (pip install) | For text-only PDFs |
-| Google Document AI | Excellent | Excellent | Yes | $1.50/1000 pages | Easy (API) | If using GCP |
-
-
-**Chosen**: **Azure Document Intelligence** (Form Recognizer) - Best layout/table detection, same cloud as LLM
-
-**Free Tier**: 500 pages/month (sufficient for demo)
-
-## 🏗️ TECHNOLOGY STACK (Detailed Comparison)
-
-### 1️⃣ **Backend Runtime / Compute**
-
-| Option | Complexity | Cost | Demo Reality | Learning Curve | Recommendation |
-|--------|-----------|------|--------------|----------------|----------------|
-| **Azure Functions (Python)** | Low | Free | High (live URL) | Low (just Python with decorators) | ✅ **Best** |
-| FastAPI + Container Apps | Medium | $10/month | High (live URL) | Medium | ⚠️ If team knows FastAPI |
-| Flask + App Service | Medium | $5/month | High (live URL) | Low | ⚠️ If avoiding serverless |
-| Pure Python Script | Very Low | Free | Medium (run on laptop) | Very Low | ✅ **Fastest for demo** |
-
-**Chosen**: **Azure Functions (Python 3.11)** - Serverless, auto-scale, free tier, minimal wrapper around Python
-
-### 3️⃣ **LLM Models**
-
-| Model | Speed | Cost | Accuracy | JSON Mode | Context | Use Case | Recommendation |
-|-------|-------|------|----------|-----------|---------|----------|----------------|
-| **GPT-4o** | Fast (1-2s) | $2.50/1M tokens | Very Good | ✅ Excellent | 128k | Extraction, Validation | ✅ **Primary** |
-| GPT-4-turbo | Slower (3-5s) | $10/1M tokens | Excellent | ✅ Good | 128k | Remedial Detection | ⚠️ **Fallback** |
-
-### 2️⃣ **Programming Language**
-
-| Language | Ecosystem | AI/ML Libraries | Azure Integration | Team Familiarity | Recommendation |
-|----------|-----------|-----------------|-------------------|------------------|----------------|
-| **Python 3.11** | Excellent | Best (openai, transformers, pandas) | Native support | High | ✅ **Best** |
-
-**Technology Decisions**:
-| Component | Options | Chosen | Why |
-|-----------|---------|--------|-----|
-| OCR | Azure DI / Tesseract | **Azure DI** | Better layout, tables |
-| Backend | Functions / Container Apps | **Functions** | Free tier, simple |
-| Storage | Table / SQL / Cosmos | **Table Storage** | Cheapest for POC |
-| Frontend Host | Static Web / App Service | **Static Web Apps** | Free, auto-deploy |
+   
 
 ---
 
-### Phase 2: AI Intelligence (Hours 9-16)
-
-**Tasks**:
-5. Extraction agent prompts — **Backend Lead + AI Engineer**
-6. Validation agent prompts — **Backend Developer**
-7. Remedial detection agent — **Backend Lead**
-8. Confidence scoring — **AI Engineer**
-9. Table Storage schema — **Backend Developer**
-
-**LLM Model Comparison**:
-
-| Model | Pros | Cons | Cost | Use Case |
-|-------|------|------|------|----------|
-| **GPT-4o** | 2x faster, 50% cheaper, good JSON | Slightly lower reasoning | $2.50/1M tokens | ✅ Extraction, Validation |
-| GPT-4-turbo | Best reasoning, 128k context | Slower (3-5s), expensive | $10/1M tokens | Remedial (fallback) |
-| Claude 3.5 | Low hallucination, good following | Separate integration | $3/1M tokens | Alternative |
-| Llama 3.1 70B | No per-token cost, privacy | GPU needed, slower | $48/24hr GPU | If budget limited |
-
-**Final Recommendation**:
-- Start with **GPT-4o** for all 3 agents
-- If remedial detection accuracy <90%, switch that agent to GPT-4-turbo
-- Estimated cost for 20 demo docs: **$0.50-2.00 total**
-
-**Framework Decision**:
-| Option | Pros | Cons | Chosen |
-|--------|------|------|--------|
-| Semantic Kernel | Microsoft native, planners | Learning curve, heavy | ❌ |
-| LangChain | Popular, many integrations | Overkill for 3 agents | ❌ |
-| **Custom Templates** | Full control, lightweight | Manual orchestration | ✅ Best for hackathon |
-
----
-
-### Phase 3: Frontend (Hours 17-24) *parallel*
-
-**Tasks**:
-10. React dashboard skeleton — **UX/BA Lead**
-11. Document cards with color coding — **Frontend Developer**
-12. Validation screen + PDF viewer — **Frontend Developer**
-13. API integration — **Frontend Developer**
-14. Override workflow — **Full Stack Developer**
-
-**UI Framework Decision**:
-| Option | Pros | Cons | Chosen |
-|--------|------|------|--------|
-| Fluent UI 2 | Microsoft design, accessible | Large bundle, learning curve | ❌ |
-| Material-UI | Popular, React-native | Heavier | ❌ |
-| **Tailwind + shadcn/ui** | Fast dev, customizable, small | Need design sense | ✅ Best balance |
-
----
-
-### Phase 4: Integration & Polish (Hours 25-36)
-
-**Tasks**:
-15. Smartsheet integration/mock — **Backend Lead**
-16. Analytics calculations — **Backend Developer**
-17. End-to-end testing — **All Team**
-18. Performance optimization — **Backend Lead**
-19. Azure deployment — **Cloud Architect**
-
-**Integration Decision**:
-| Option | Pros | Cons | Chosen |
-|--------|------|------|--------|
-| Smartsheet Webhook | Real-time, no polling | Requires admin access | ❌ Too risky |
-| API Polling (5min) | Simple, read-only | Slight delay | ⚠️ Fallback |
-| **Manual Upload UI** | Works without access, demo-friendly | Not "real" integration | ✅ Safest for demo |
-
-**Recommendation**: Build upload UI with "Imported from Smartsheet" label, explain webhook for production
-
----
-
-### Phase 5: Demo Prep (Hours 37-48)
-
-**Tasks**:
-20. Demo script (5 min) — **Product Manager**
-21. Pre-load data, warm services — **Cloud Architect**
-22. Backup video — **UX/BA Lead**
-23. Judge Q&A prep — **All Team**
-24. Full rehearsal — **All Team**
-
----
-
-## TEAM ROLE ASSIGNMENTS
-
-**Minimum Team: 4 people** (combine roles below)
-
-| Role | Responsibilities | Can Combine With |
-|------|------------------|------------------|
-| **Product** | Success criteria, demo narrative, judge Q&A | UX/BA Lead |
-| **UX/BA** | Figma, sample docs, frontend components, video | Product Manager |
-| **Backend** | Architecture, agent prompts, confidence logic, delegation | AI Engineer |
-| **AI Engineer** | Azure OpenAI/DI integration, model testing, prompt optimization | Backend Lead |
-| **Cloud- devops** | Azure provisioning, deployment, cost monitoring | Backend Developer |
-| **Frontend** | React dashboard, PDF viewer, UI components | Full Stack |
-| **Backend** | Azure Functions, Table Storage, validation agent | Cloud Architect |
-| **Full Stack** | Smartsheet/upload, override workflow, E2E testing | Frontend |
-
-**Recommended 4-Person Team**:
-1. Product Manager + UX/BA Lead
-2. Backend Lead + AI Engineer
-3. Cloud Architect + Backend Developer
-4. Frontend Developer + Full Stack Developer
-
----
-
-## ALTERNATIVE TECHNOLOGY STACKS
-
-### Alt Stack 1: "Microsoft All-In" (Enterprise Production)
-- **When**: Corporate compliance critical, budget available
-- **Stack**: GPT-4-turbo, Semantic Kernel, Fluent UI 2, Container Apps, SQL DB, Azure AD
-- **Cost**: ~$50-100/month production
-
-### Alt Stack 2: "Open Source Maximum" (Learning/Cost Focus)
-- **When**: No vendor lock-in, minimal cost
-- **Stack**: Llama 3.1 (self-hosted), Tesseract, FastAPI, PostgreSQL, Vercel
-- **Cost**: Free (GPU credits) OR $20/month
-
-### Alt Stack 3: "Hybrid Performance" (Best Accuracy)
-- **When**: Accuracy > cost for POC
-- **Stack**: Claude 3.5 Sonnet, Azure DI, AWS Lambda, DynamoDB, Next.js
-- **Cost**: ~$25-40 for hackathon
-
----
-
-## ✅ VERIFICATION & DEMO CHECKLIST
-
-### Functional Testing
-- [ ] 5 pass documents → All auto-approved with >85% confidence
-- [ ] 3 remedial documents → All flagged, issues extracted correctly
-- [ ] 1 override → Status updates persist
-- [ ] Analytics dashboard → Counts accurate
-- [ ] Edge cases (corrupted PDF, wrong type) → Graceful failure
-
-### Performance Testing
-- [ ] 20 documents → All process within 2 min each
-- [ ] Azure costs → Under $10 total
-
-### Demo Rehearsal
-- [ ] Full workflow in <5 minutes
-- [ ] Answer "What if AI is wrong?" → Show override
-- [ ] Quantify impact: "Saves 24 hours/month per officer"
-
----
-
-## 🚧 RISKS & MITIGATION
-
-| Risk | Mitigation | Fallback |
-|------|------------|----------|
-| **Smartsheet access not granted** | Start with manual upload UI | Label as "from Smartsheet", explain webhook for prod |
-| **Document formats too varied** | Low confidence → manual review | Collect overrides, refine prompts |
-| **Azure costs exceed credits** | Limit to 20-30 demo documents | Use GPT-3.5-Turbo for non-critical agents |
-| **Document Intelligence latency** | Pre-process demo docs | Show processing animation, use smaller PDFs |
-| **Live demo service timeout** | Pre-load data in Table Storage | Have backup video ready |
-
-**Minimal Viable Demo** (if time-crunched):
-1. Manual upload interface
-2. Show AI processing
-3. Display extractions + remedial classification with confidence
-4. Demonstrate override workflow
-5. (Skip analytics if needed)
-
----
-
-## 📊 SUCCESS METRICS
+##  SUCCESS METRICS
 
 **Demo Success**:
-- ✅ End-to-end flow: Upload → AI Process → Review → Override → Route
-- ✅ Live on Azure with shareable URL
-- ✅ 80%+ accuracy on sample documents
-- ✅ Clear confidence scores and reasoning shown
-- ✅ Professional UI matching Figma designs
+- End-to-end flow: Upload → AI Process → Review → Override → Route
+- Live on Azure with shareable URL
+- 80%+ accuracy on sample documents
+- Clear confidence scores and reasoning shown
+- professional UI matching Figma designs
 
 **Business Success** (Post-Hackathon):
 - 80%+ automation rate on real documents
@@ -350,37 +205,46 @@ Dashboard   ◄────  [API HTTP]      ◄────   [Read/Update]
 
 ---
 
-## 📅 NEXT ACTIONS
+## NEXT ACTIONS
 
-### UX/BA Lead:
-1. Finalize Figma verbiage based on this plan
-2. Get Smartsheet access from business stakeholders
-3. Create 5-10 anonymized sample documents (mix of pass/remedial)
-4. Document expected fields per document type
+**Pre-work**: All team members review this document and come with questions
 
-### Backend Lead:
-1. Design detailed architecture diagram with data flows
-2. Create phase-wise task breakdown with hourly estimates
-3. Set up GitHub repository structure
-4. Define API contracts (OpenAPI spec)
+### Product - Himanshi:
+1. Finalize Figma verbiage based on this plan --done
+2. Get Smartsheet access from business stakeholders -- done
+3. identify 5-10 anonymized sample documents (mix of pass/remedial) -Anil can acess them but we need one alomost all cases
+4. Document expected fields per document type - can we get these from buisness?
 
-### AI Engineer:
-1. Research Azure Document Intelligence pricing/quotas
-2. Test extraction with sample PDFs
-3. Draft initial extraction agent prompts
-4. Compare GPT-4o vs GPT-4-turbo on samples
+   
+## Frontend Vansh, Vikas
+1. go through the figma and try to implement Frontend part
+2. React dashboard skeleton — **UX/BA Lead**
+3. Document cards with color coding — **Frontend**
+4. Validation screen + PDF viewer — **Frontend**
+5. API integration — **Frontend**
+6. Override workflow — **Full Stack Developer**
 
-### Cloud Architect:
+### Backend - Dushyant/Vansh:
+1. Design detailed architecture diagram with data flows --> drafted
+2. Create phase-wise braeakdown ->  drafted
+3. create up GitHub repository  --> done, will setup as we go through the coding
+4. Research Azure Document Intelligence pricing/quotas -> in process
+5. Compare GPT-4o vs GPT-4-turbo on samples
+
+
+### AI Intelligence - Dushyant/ Himanshi(scoring threshold)/Vikas
+
+**Tasks**:
+5. Extraction agent prompts  
+6. Validation agent prompts  
+7. Remedial detection agent 
+8. Confidence scoring calculation
+9. Table Storage schema 
+   
+### Cloud Vikas , Asif, :
 1. Set up Azure resource group
 2. Configure storage accounts, verify free tier limits
-3. Create service principals for CI/CD
-4. Document deployment & rollback process
 
-### Product Manager:
-1. Schedule mid-sprint architecture review call (Tuesday recommended)
-2. Define demo script and judging talking points
-3. Create timeline with milestones
-4. Prepare backup plans for risks
 
 ### All Team:
 1. Review this plan, provide feedback
@@ -390,7 +254,7 @@ Dashboard   ◄────  [API HTTP]      ◄────   [Read/Update]
 
 ---
 
-## NEXT MEETING (Suggested: Tuesday Mid-Sprint)
+## NEXT MEETING (Suggested: Tuesday tomorrow Mid-Sprint)
 
 **Agenda**:
 1. Review detailed architecture diagram (15 min)
@@ -398,11 +262,6 @@ Dashboard   ◄────  [API HTTP]      ◄────   [Read/Update]
 3. Assign specific tasks with time estimates (15 min)
 4. Set up development environment together (20 min)
 5. Q&A, blockers, risks (10 min)
-
-**Pre-work**: All team members review this document and come with questions
-
----
-
 
 
 **New Files to Create**:
@@ -418,25 +277,378 @@ Dashboard   ◄────  [API HTTP]      ◄────   [Read/Update]
 
 ---
 
-## JUDGE Q&A PREP
 
-**Q: What if the AI makes a mistake?**
-A: We have confidence scoring on every decision. Officers review anything <85% confidence. They can override with one click, and we track that as feedback to improve the prompts. Zero false negatives on critical safety issues is our #1 priority.
 
-**Q: How much does this save?**
-A: Officers currently spend 10-15 min manually reviewing each document. With 80% auto-approval at <2 min processing time, we save ~24 hours per month per officer. That's $50k+ annual value in time savings, plus faster identification of critical safety issues.
 
-**Q: Can this work with other document types?**
-A: Yes! The same pattern works for any semi-structured compliance document. We use Azure Document Intelligence for layout extraction and prompt engineering to adapt to different document formats. It's a framework, not a one-off solution.
 
-**Q: Why not just use manual review?**
-A: Volume is growing, consistency is hard with human review, and compliance officers should focus on critical remedial actions, not validating site names and dates. AI handles the repetitive work, humans handle the nuanced decisions.
+# Implementation Phases - Hackathon POC
 
-**Q: What about production deployment?**
-A: This POC proves the concept. Production would add: Smartsheet webhooks for real-time processing, Active Directory auth, direct API integration with elog books and IFM Hub for automated routing, and expanded document types. We'd also collect human overrides to continuously improve via prompt refinement or fine-tuning.
+## Phase Timeline
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          HACKATHON PHASES                                 │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────┐          ┌──────────┐         ┌──────────┐         ┌──────────┐       ┌──────────┐
+│  PHASE 1 │  ──────> │  PHASE 2 │  ────> │  PHASE 3 │  ────>  │  PHASE 4 │ ────> │  PHASE 5 │
+│Foundation│          │    AI    │         │ Frontend │         │Integration│       │Demo Prep │
+└──────────┘          └──────────┘         └──────────┘         └──────────┘       └──────────┘
+
+ Setup &              Agent             React Dashboard        End-to-End         Rehearsal &
+Infrastructure      Development          + PDF Viewer         Testing + Deploy     Polish
+```
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: April 20, 2026
-**Status**: Ready for Team Review
+## Phase Breakdown
+
+### **Phase 1: Foundation**
+**Goal**: Infrastructure ready for AI development
+
+**Parallel Workstreams**:
+- **Cloud Architect**: Provision Azure resources (Storage, Functions, OpenAI, Document Intelligence)
+- **UX/BA Lead**: Create 5-10 sample documents (mix of pass/remedial)
+- **Backend Lead**: Azure Function scaffolding with 3 function templates
+- **AI Engineer**: Test Document Intelligence API with sample PDFs
+
+**Deliverables**:
+- Azure resources deployed
+- Sample documents ready
+- Function app skeleton running
+- OCR successfully extracting text
+
+**Tech Decisions Made**: OCR choice, backend runtime, storage type, frontend host
+
+---
+
+### **Phase 2: AI Intelligence**
+**Goal**: 3-agent pipeline processing documents end-to-end
+
+**Tasks**:
+- Build **Extraction Agent** (GPT-4o): Pull site, PPM ref, date, inspector, equipment
+- Build **Validation Agent** (GPT-4o): Cross-check extracted vs expected metadata
+- Build **Remedial Detection Agent** (GPT-4o): Classify PASS/REMEDIAL_MINOR/CRITICAL
+- Implement **Confidence Scoring**: Weighted average (30% extract + 30% validate + 40% remedial)
+- Design Table Storage schema with all fields
+
+**Deliverables**:
+- 3 working prompt templates
+- JSON responses from all agents
+- Confidence scoring logic
+- Documents saved to Table Storage
+
+**Model Decision**: Start with GPT-4o for all agents; switch remedial to GPT-4-turbo if accuracy <90%
+
+---
+
+### **Phase 3: Frontend**
+**Goal**: User-friendly dashboard for reviewing AI decisions
+
+**Parallel with Phase 2 End**:
+- **Frontend Developer**: React + Vite setup, Tailwind + shadcn/ui installation
+- **UX/BA Lead**: Implement DocumentCard component with color-coding
+
+**Main Development**:
+- Build **Upload Dashboard**: Grid of cards (green/yellow/red by confidence)
+- Build **Validation Screen**: Split view (PDF left, AI analysis right)
+- Integrate **react-pdf** viewer with zoom/navigation
+- Connect to backend APIs with TanStack Query (10s polling)
+- Implement **Override Workflow**: Approve/reject AI decisions
+
+**Deliverables**:
+- Dashboard showing all documents
+- PDF viewer with AI extracted fields
+- Working override buttons
+- Real-time updates from backend
+
+**UI Decision**: Tailwind + shadcn/ui for rapid prototyping
+
+---
+
+### **Phase 4: Integration & Polish**
+**Goal**: End-to-end system working seamlessly
+
+**Integration Work**:
+- Smartsheet integration (or manual upload fallback UI)
+- Analytics calculations (processed count, auto-approve %, time saved)
+- End-to-end testing with all 10 sample documents
+- Performance optimization (cold start, caching, batch processing)
+- Azure deployment with CI/CD pipeline
+
+**Testing Scenarios**:
+1. Upload 5 pass docs → All auto-approved (>85% confidence)
+2. Upload 3 remedial docs → All flagged with issues extracted
+3. Officer override test → Changes reflected in dashboard
+4. Refresh test → Data persists correctly
+
+**Deliverables**:
+- Full document flow working
+- Deployed to Azure (live URL)
+- All test cases passing
+- Sub-2min processing time per doc
+
+**Integration Decision**: Manual upload UI with "Imported from Smartsheet" label (safest for demo)
+
+---
+
+### **Phase 5: Demo Prep**
+**Goal**: Flawless 5-minute demo ready with backup plan
+
+**Preparation**:
+- **Product Manager**: Write demo script (problem → solution → tech → impact)
+- **Cloud Architect**: Pre-load 15 documents, warm all Azure services (avoid cold starts)
+- **UX/BA Lead**: Record backup video (if live demo fails)
+- **All Team**: Prepare judge Q&A answers (15 anticipated questions)
+- **Full Team**: 3× full rehearsals (5 min each)
+
+**Demo Flow**:
+1. **Problem** (30s): Show messy vendor PDFs, explain manual process pain
+2. **Upload** (1 min): Upload new doc, show AI processing in real-time
+3. **Dashboard** (1 min): Walk through color-coded cards, confidence scores
+4. **Validation** (1.5 min): Deep dive into one doc - PDF + extracted fields + remedial analysis
+5. **Override** (30s): Show officer can override AI decision
+6. **Analytics** (30s): Show KPIs (80% auto-approved, 38 hours saved)
+7. **Tech Stack** (30s): Quick architecture diagram, mention Azure + GPT-4o
+
+**Judge Q&A Prep**:
+- What if AI is wrong? → Human override + confidence thresholds
+- Cost at scale? → $10-15/1000 docs (detailed breakdown ready)
+- Why not open-source models? → Speed + JSON mode (show comparison table)
+- Security concerns? → Azure Key Vault + Managed Identity
+- Production timeline? → 2-4 weeks with Smartsheet webhook + Azure AD
+
+**Deliverables**:
+- 5-minute demo script memorized
+- Backup video recorded
+- Services warmed (no cold starts)
+- Judge Q&A cheat sheet
+- Team confident and rested
+
+---
+
+## Success Metrics
+
+| Metric | Target | Status |
+|--------|--------|--------|
+| **Auto-Approval Rate** | 80%+ on pass docs | Test in Phase 4 |
+| **Remedial Detection** | 100% (zero false negatives) | Validate in Phase 4 |
+| **Processing Time** | <2 min per doc | Benchmark in Phase 4 |
+| **Confidence Accuracy** | Matches human judgment 85%+ | Compare in Phase 4 |
+| **Demo Success** | No failures, <5 min | Rehearse in Phase 5 |
+| **Budget** | <$15 total Azure costs | Monitor in Phase 5 |
+
+---
+
+## Critical Path & Dependencies
+
+### **Phase Dependency Flow**
+
+```mermaid
+graph LR
+    P1[Phase 1:<br/>Azure Setup] --> P2[Phase 2:<br/>AI Agents]
+    P2 --> P4[Phase 4:<br/>Integration]
+    
+    P1 -.->|Parallel| P3[Phase 3:<br/>Frontend]
+    P3 --> P4
+    
+    P4 --> P5[Phase 5:<br/>Demo Prep]
+    
+    style P1 fill:#e1f5fe
+    style P2 fill:#fff9c4
+    style P3 fill:#f3e5f5
+    style P4 fill:#c8e6c9
+    style P5 fill:#ffccbc
+```
+
+---
+
+### **Backend vs Frontend Work Distribution**
+
+```mermaid
+flowchart LR
+    subgraph Backend["Backend Track"]
+        B1[Phase 1<br/>Setup]
+        B2[Phase 2<br/>AI Agents]
+        B4[Phase 4<br/>Integration]
+    end
+    
+    subgraph Frontend["Frontend Track"]
+        F3[Phase 3<br/>UI Development]
+    end
+    
+    subgraph Both["Combined"]
+        P5[Phase 5<br/>Demo Prep]
+    end
+    
+    B1 --> B2 --> B4 --> P5
+    B1 -.->|Parallel| F3 --> B4
+    
+    style Backend fill:#e1f5fe
+    style Frontend fill:#f3e5f5
+    style Both fill:#ffccbc
+```
+
+---
+
+### **Detailed Component Timeline**
+
+```mermaid
+timeline
+    title Backend Development Across Phases
+    
+    section Phase 1 - Foundation
+        Azure Resources : Storage Account
+                       : Function App
+                       : OpenAI Service
+                       : Document Intelligence
+        Function Scaffolding : 3 Function templates
+                            : Environment config
+                            : Local dev setup
+    
+    section Phase 2 - AI Intelligence
+        AI Agent 1 : Extraction Agent
+                  : GPT-4o integration
+                  : JSON mode prompts
+        AI Agent 2 : Validation Agent
+                  : Cross-checking logic
+        AI Agent 3 : Remedial Detection
+                  : Classification logic
+        Backend Core : Confidence scoring
+                    : Table Storage schema
+                    : OCR integration
+    
+    section Phase 4 - Integration
+        Integration : Smartsheet API
+                   : Analytics endpoints
+                   : Testing & optimization
+        Deployment : CI/CD pipeline
+                  : Azure deployment
+```
+
+---
+
+### **Backend Component Breakdown**
+
+```mermaid
+flowchart TD
+    Start([Hackathon Start]) --> P1
+    
+    subgraph P1["Phase 1: Backend Setup"]
+        Setup1[Azure Function App]
+        Setup2[Storage Account<br/>Blob + Table + Queue]
+        Setup3[Azure OpenAI Service]
+        Setup4[Document Intelligence]
+        Setup5[Function Templates<br/>3 HTTP/Timer/Queue triggers]
+    end
+    
+    subgraph P2["Phase 2: AI Backend"]
+        Agent1[Extraction Agent<br/>GPT-4o + JSON Mode]
+        Agent2[Validation Agent<br/>Metadata Cross-check]
+        Agent3[Remedial Detection<br/>PASS/REMEDIAL Classification]
+        Score[Confidence Scoring<br/>Weighted Average]
+        Schema[Table Storage Schema<br/>Document + Fields + Analysis]
+    end
+    
+    subgraph P3["Phase 3: Frontend"]
+        UI1[React Dashboard]
+        UI2[PDF Viewer]
+        UI3[API Integration]
+    end
+    
+    subgraph P4["Phase 4: Backend Integration"]
+        Int1[Smartsheet API Polling]
+        Int2[Analytics Calculations]
+        Int3[API Gateway Endpoints]
+        Int4[End-to-End Testing]
+        Deploy[Azure Deployment]
+    end
+    
+    P1 --> P2
+    P2 --> P4
+    P1 -.->|Parallel| P3
+    P3 --> P4
+    
+    P4 --> P5[Phase 5: Demo Prep]
+    
+    style P1 fill:#e1f5fe
+    style P2 fill:#fff9c4
+    style P3 fill:#f3e5f5
+    style P4 fill:#c8e6c9
+    style P5 fill:#ffccbc
+    
+    style Agent1 fill:#c5e1a5
+    style Agent2 fill:#c5e1a5
+    style Agent3 fill:#c5e1a5
+```
+
+---
+
+### **Backend API Endpoints Development**
+
+```mermaid
+graph TB
+    subgraph API["Backend API Development"]
+        subgraph P2Endpoints["Phase 2: Internal Processing"]
+            EP1[Document Intelligence API<br/>OCR + Layout]
+            EP2[Azure OpenAI API<br/>3 Agent Calls]
+            EP3[Table Storage Operations<br/>CRUD Documents]
+        end
+        
+        subgraph P4Endpoints["Phase 4: External APIs"]
+            EP4[GET /api/documents<br/>List with filters]
+            EP5[GET /api/documents/:id<br/>Detail view]
+            EP6[PUT /api/documents/:id/override<br/>Human override]
+            EP7[GET /api/analytics<br/>KPI calculations]
+            EP8[POST /api/upload<br/>Manual upload]
+            EP9[Smartsheet API Integration<br/>Polling every 5min]
+        end
+    end
+    
+    EP1 --> EP2
+    EP2 --> EP3
+    EP3 --> EP4
+    EP3 --> EP5
+    EP3 --> EP6
+    EP3 --> EP7
+    
+    style EP1 fill:#ffccbc
+    style EP2 fill:#c5e1a5
+    style EP3 fill:#90caf9
+    style EP4 fill:#fff59d
+    style EP5 fill:#fff59d
+    style EP6 fill:#fff59d
+    style EP7 fill:#fff59d
+    style EP8 fill:#fff59d
+    style EP9 fill:#ffab91
+```
+
+**Critical Blockers**:
+- Phase 2 depends on Phase 1 (need Azure OpenAI deployed)
+- Phase 4 depends on Phase 2 & 3 (need API + UI ready)
+- Phase 3 can start early (doesn't block backend work)
+
+**Parallel Work Opportunities**:
+- Hours 1-8: All 4 team members work independently
+- Hours 17-24: Frontend + final AI tuning happen simultaneously
+- Hours 37-48: Demo prep while Cloud Architect stabilizes deployment
+
+---
+
+## Communication Checkpoints
+
+| Checkpoint | Purpose |
+|-----------|---------|
+| **End of Phase 1** | Show Azure resources + sample docs + OCR working |
+| **End of Phase 2** | Show AI agents processing 1 doc end-to-end |
+| **End of Phase 3** | Show complete UI with API integration |
+| **End of Phase 4** | Full system test with all sample docs |
+| **Demo Rehearsal 1** | Practice full 5-minute demo |
+| **Demo Rehearsal 2** | Iron out rough spots |
+| **Final Rehearsal** | Camera-ready, timed performance |
+
+---
+
+**Last Updated**: April 20, 2026  
+**Team Size**: 4 people (combined roles)  
+**Phases**: 5 sequential phases with parallel work opportunities
