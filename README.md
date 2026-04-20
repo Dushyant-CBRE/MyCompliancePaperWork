@@ -26,9 +26,7 @@ CBRE facilities management teams manually process hundreds of statutory PPM (Pla
 1. Manually validate each document (correct site, PPM type, dates)
 2. Apply naming conventions
 3. Classify as pass (satisfactory) or requires remedial action
-4. Upload satisfactory docs to elog books repository
-5. Create corrective actions in IFM Hub for failures
-6. Update separate compliance tracker spreadsheet
+4. Update separate compliance tracker spreadsheet
 
 **Pain Points**: Bottlenecks, inconsistencies, delays in identifying critical safety issues
 
@@ -37,9 +35,9 @@ CBRE facilities management teams manually process hundreds of statutory PPM (Pla
 ## SOLUTION OVERVIEW
 
 An intelligent document processing pipeline that:
-1. **Ingests** vendor documents from Smartsheet (webhook/polling)
-2. **Extracts** structured data using Azure Document Intelligence
-3. **Validates** fields against metadata using GPT-4 agents
+1. **Ingests** vendor documents from Smartsheet (manually/webhook)
+2. **Extracts** structured data using Azure Document Intelligence or any othe rmech
+3. **Validates** fields against metadata using GPT agents
 4. **Detects** remedial actions via NLP analysis
 5. **Scores** confidence and routes automatically
 6. **Enables** human override via dashboard
@@ -53,8 +51,8 @@ An intelligent document processing pipeline that:
 
 ### AI/ML Layer
 - **Primary LLM**: Azure OpenAI GPT-4o (extraction, validation) - Fast, cheap, good JSON mode
-- **Fallback LLM**: Azure OpenAI GPT-4-turbo (remedial detection) - Better reasoning if needed
-- **Document OCR**: Azure Document Intelligence - Layout detection, table extraction
+- **Fallback LLM**: Azure OpenAI GPT-4o (remedial detection) - Better reasoning if needed
+- **Document OCR**: Azure Document Intelligence - Layout detection, table extraction(we may use some other mech to do that)
 - **Prompts**: Custom Python templates (no framework overhead)
 
 ### Backend
@@ -63,17 +61,10 @@ An intelligent document processing pipeline that:
 - **Triggers**: Timer (poll) + Queue (process) + HTTP (API)
 
 ### Frontend
-- **Framework**: React 18 + Vite
+- **Framework**: React 18 
 - **UI**: Tailwind CSS + shadcn/ui - Rapid prototyping
 - **PDF Viewer**: react-pdf
-- **State**: TanStack Query + Context
 - **Hosting**: Azure Static Web Apps - Free tier with CI/CD
-
-### Cost Projection (24hr hackathon)
-- Azure OpenAI: $1-3
-- Document Intelligence: $5-10
-- Functions/Storage/Static Web: Free tier
-- **Total: $10-15** ✓ Well within $200 credits
 
 ---
 
@@ -82,10 +73,93 @@ An intelligent document processing pipeline that:
 ### Phase 1: Foundation (Hours 1-8) *parallel work*
 
 **Tasks**:
-1. Set up Azure resources — **Cloud Architect**
-2. Create sample documents — **UX/BA Lead**
-3. Build Azure Function scaffolding — **Backend Lead**
-4. Test Document Intelligence API — **AI Engineer**
+1. Set up Azure resources — **Cloud Architect- Asif is checking that**
+
+   ### 5️⃣ **Document Storage (Files)**
+
+| Option | Cost | Access Speed | Scalability | Setup | Query Capability | Recommendation |
+|--------|------|--------------|-------------|-------|------------------|----------------|
+| **Azure Blob Storage** | $0.018/GB | Fast | Unlimited | Easy | By path only |  **Best for files** |
+
+**Chosen**: **Azure Blob Storage** - Cheapest, simple, perfect for storing PDF/image files
+
+### 6️⃣ **Metadata / Structured Data Storage**
+
+| Option | Complexity | Cost | Query Speed | Relational | Schema | Setup | Recommendation |
+|--------|-----------|------|-------------|-----------|--------|-------|----------------|
+| **Azure Table Storage** | Low | $0.05/GB | Fast |  NoSQL | Flexible | Easy |  **Best for POC** |
+| Azure SQL Database | High | $5/month min | Very Fast | Yes | Rigid | Medium |  If need joins/complex queries |
+
+**Chosen**: **Azure Table Storage** - Simple NoSQL, dirt cheap, sufficient for document metadata
+
+3. Get Create sample documents — **Already have that** 
+4. Build Azure Function scaffolding — **Vikas and Vansh can check**
+
+┌─────────────────────────────────────────────────────────┐
+│ AZURE FUNCTIONS = Your Backend Brain                    │
+└─────────────────────────────────────────────────────────┘
+
+Smartsheet          Azure Function 1           Blob Storage
+   PDF    ──────►   [Poller Timer]   ──────►   [Documents]
+                         │
+                         ▼
+                    Queue Message
+                         │
+                         ▼
+Document           Azure Function 2        Table Storage
+Intelligence  ◄── [Processor Queue]  ─►   [Metadata/Results]
+   +                     │
+GPT-4o                   │
+Agents                   ▼
+                   
+React              Azure Function 3        Table Storage
+Dashboard   ◄────  [API HTTP]      ◄────   [Read/Update]
+
+
+
+
+
+5. Revision all existing models that are pretrained and we can use eg Azure Document Intelligence — **Dushyant**
+###  **Document OCR / Text Extraction**
+
+| Option | Layout Detection | Table Extraction | Handwriting | Cost | Setup | Recommendation |
+|--------|-----------------|------------------|-------------|------|-------|----------------|
+| **Azure Document Intelligence** | Excellent | Excellent | Yes | $1.50/1000 pages | Easy (API) | **Best** |
+| Tesseract OCR | Poor | No |  Fair | Free | Medium (local install) | If cost critical |
+| AWS Textract | Good | Good | Yes | $1.50/1000 pages | Easy (API) | If using AWS |
+| PyMuPDF + PyPDF2 | Basic | No | No | Free | Easy (pip install) | For text-only PDFs |
+| Google Document AI | Excellent | Excellent | Yes | $1.50/1000 pages | Easy (API) | If using GCP |
+
+
+**Chosen**: **Azure Document Intelligence** (Form Recognizer) - Best layout/table detection, same cloud as LLM
+
+**Free Tier**: 500 pages/month (sufficient for demo)
+
+## 🏗️ TECHNOLOGY STACK (Detailed Comparison)
+
+### 1️⃣ **Backend Runtime / Compute**
+
+| Option | Complexity | Cost | Demo Reality | Learning Curve | Recommendation |
+|--------|-----------|------|--------------|----------------|----------------|
+| **Azure Functions (Python)** | Low | Free | High (live URL) | Low (just Python with decorators) | ✅ **Best** |
+| FastAPI + Container Apps | Medium | $10/month | High (live URL) | Medium | ⚠️ If team knows FastAPI |
+| Flask + App Service | Medium | $5/month | High (live URL) | Low | ⚠️ If avoiding serverless |
+| Pure Python Script | Very Low | Free | Medium (run on laptop) | Very Low | ✅ **Fastest for demo** |
+
+**Chosen**: **Azure Functions (Python 3.11)** - Serverless, auto-scale, free tier, minimal wrapper around Python
+
+### 3️⃣ **LLM Models**
+
+| Model | Speed | Cost | Accuracy | JSON Mode | Context | Use Case | Recommendation |
+|-------|-------|------|----------|-----------|---------|----------|----------------|
+| **GPT-4o** | Fast (1-2s) | $2.50/1M tokens | Very Good | ✅ Excellent | 128k | Extraction, Validation | ✅ **Primary** |
+| GPT-4-turbo | Slower (3-5s) | $10/1M tokens | Excellent | ✅ Good | 128k | Remedial Detection | ⚠️ **Fallback** |
+
+### 2️⃣ **Programming Language**
+
+| Language | Ecosystem | AI/ML Libraries | Azure Integration | Team Familiarity | Recommendation |
+|----------|-----------|-----------------|-------------------|------------------|----------------|
+| **Python 3.11** | Excellent | Best (openai, transformers, pandas) | Native support | High | ✅ **Best** |
 
 **Technology Decisions**:
 | Component | Options | Chosen | Why |
@@ -329,12 +403,7 @@ An intelligent document processing pipeline that:
 
 ---
 
-## 📚 REFERENCE MATERIALS
 
-**Existing Project Files**:
-- [csv_headers_summary.txt](csv_headers_summary.txt) - Smartsheet field reference (PPM_Ref, Site, Vendor)
-- [config/config.yaml](config/config.yaml) - Store Azure connection strings, API keys
-- [requirements.txt](requirements.txt) - Add: azure-functions, azure-storage-blob, azure-ai-formrecognizer, openai
 
 **New Files to Create**:
 - `src/agents/extraction\\\\\\\_agent.py` - GPT-4 field extraction
