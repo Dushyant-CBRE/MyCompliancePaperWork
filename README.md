@@ -1,4 +1,4 @@
-#Hackathon POC: AI-Powered Compliance Paperwork Automation
+# Hackathon POC: AI-Powered Compliance Paperwork Automation
 
 **Project Name**: My Compliance Paperwork - Intelligent Document Validation
 **Date**: April 2026
