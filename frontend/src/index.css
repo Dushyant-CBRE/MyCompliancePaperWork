@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-border: var(--border);
+	--color-ring: var(--ring);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-input-background: var(--input-background);
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+}
+
+:root {
+	--background: #ffffff;
+	--foreground: #435254;
+	--card: #ffffff;
+	--card-foreground: #435254;
+	--primary: #003F2D;
+	--primary-foreground: #ffffff;
+	--secondary: #F6F8F7;
+	--secondary-foreground: #435254;
+	--muted: #F6F8F7;
+	--muted-foreground: #717182;
+	--accent: #17E88F;
+	--accent-foreground: #003F2D;
+	--destructive: #d4183d;
+	--destructive-foreground: #ffffff;
+	--border: rgba(0, 0, 0, 0.1);
+	--ring: #003F2D;
+	--radius: 0.375rem;
+	--sidebar: #003F2D;
+	--sidebar-foreground: #ffffff;
+	--sidebar-primary: #17E88F;
+	--sidebar-primary-foreground: #003F2D;
+	--sidebar-accent: rgba(255, 255, 255, 0.1);
+	--sidebar-accent-foreground: #ffffff;
+	--sidebar-border: rgba(255, 255, 255, 0.1);
+	--sidebar-ring: #17E88F;
+	--input-background: #F6F8F7;
+	font-size: 16px;
+}
+
+@layer base {
+	* {
+		box-sizing: border-box;
+		margin: 0;
+		padding: 0;
+	}
+
+	body {
+		background-color: var(--background);
+		color: var(--foreground);
+		font-family: 'Inter', system-ui, -apple-system, sans-serif;
+		-webkit-font-smoothing: antialiased;
+	}
+
+	h1 {
+		font-size: 1.5rem;
+		font-weight: 500;
+		line-height: 1.3;
+	}
+
+	h2 {
+		font-size: 1.25rem;
+		font-weight: 500;
+		line-height: 1.4;
+	}
+
+	h3 {
+		font-size: 1.125rem;
+		font-weight: 500;
+		line-height: 1.4;
+	}
+
+	p {
+		margin: 0;
+	}
+}
