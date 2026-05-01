@@ -5,11 +5,13 @@ Ties together the full AI pipeline for a single document:
 
   1. Upload PDF → Blob Storage  (storage_service)
   2. Extract text from PDF       (pdf_extractor – PyMuPDF + GPT-4o Vision)
-  3. Agent 1: Field Extraction   (extraction_agent)
-  4. Agent 2: Validation         (validation_agent)
-  5. Agent 3: Remedial Detection (remedial_agent)
-  6. Confidence Scoring          (confidence_scorer)
-  7. Persist full result          (storage_service)
+  3. Agentic Orchestrator        (orchestrator)
+       ├─ Agent 1: Field Extraction   (extraction_agent)   ← called via tool
+       ├─ Agent 2: Validation         (validation_agent)   ← called via tool
+       ├─ Agent 3: Remedial Detection (remedial_agent)     ← called via tool
+       └─ Feedback loops / re-extraction as needed
+  4. Confidence Scoring          (confidence_scorer)
+  5. Persist full result          (storage_service)
 
 Each step updates the document status so the dashboard can track progress in
 near real-time.
@@ -19,15 +21,14 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from backend.agents.extraction_agent import run_extraction_agent
-from backend.agents.remedial_agent import run_remedial_detection_agent
-from backend.agents.validation_agent import run_validation_agent
+from backend.agents.orchestrator import run_orchestrator
 from backend.models.document import (
     DocumentMetadata,
     DocumentRecord,
     DocumentStatus,
 )
 from backend.services.confidence_scorer import calculate_confidence
+from backend.services.insights_service import generate_insights
 from backend.services.pdf_extractor import extract_text_from_pdf
 from backend.services.storage_service import save_document, upload_pdf_to_blob
 
@@ -70,39 +71,60 @@ def process_document(
         logger.info("[%s] Step 2: Extracting text from PDF", document_id)
         document_text = extract_text_from_pdf(pdf_bytes)
 
-        # ── Step 3: Agent 1 – Field Extraction ───────────────────────────────
-        logger.info("[%s] Step 3: Running Extraction Agent", document_id)
-        extracted_fields = run_extraction_agent(document_text)
+        # ── Step 3: Agentic Orchestrator ─────────────────────────────────────
+        # The orchestrator runs an agentic loop: it calls extraction, validation,
+        # and remedial tools in an order it decides, looping back to re-extract
+        # low-confidence fields before validating.
+        logger.info("[%s] Step 3: Running Agentic Orchestrator", document_id)
+        extracted_fields, validation_result, remedial_result, agent_state = run_orchestrator(
+            document_text=document_text,
+            metadata=metadata,
+            document_id=document_id,
+        )
+
         record.extracted_fields = extracted_fields
-        save_document(record)
-
-        # ── Step 4: Agent 2 – Validation ─────────────────────────────────────
-        logger.info("[%s] Step 4: Running Validation Agent", document_id)
-        validation_result = run_validation_agent(extracted_fields, metadata)
         record.validation_result = validation_result
-        save_document(record)
-
-        # ── Step 5: Agent 3 – Remedial Detection ─────────────────────────────
-        logger.info("[%s] Step 5: Running Remedial Detection Agent", document_id)
-        remedial_result = run_remedial_detection_agent(document_text)
         record.remedial_result = remedial_result
+        record.agent_state = agent_state
         save_document(record)
 
-        # ── Step 6: Confidence Scoring + Routing ─────────────────────────────
-        logger.info("[%s] Step 6: Calculating confidence score", document_id)
+        # ── Step 4: Confidence Scoring + Routing ─────────────────────────────
+        logger.info("[%s] Step 4: Calculating confidence score", document_id)
         confidence_score = calculate_confidence(
             extracted_fields, validation_result, remedial_result
         )
         record.confidence_score = confidence_score
+
+        # ── Step 5: Generate Insights ─────────────────────────────────────────
+        logger.info("[%s] Step 5: Generating document insights", document_id)
+        record.insights = generate_insights(
+            extracted_fields, validation_result, remedial_result, confidence_score
+        )
+
+        # If orchestrator routing conflicts with scorer, log and defer to scorer
+        # (scorer uses auditable numerical thresholds; orchestrator advice is advisory)
+        if (
+            agent_state.orchestrator_routing
+            and agent_state.orchestrator_routing != confidence_score.decision.value.upper()
+        ):
+            logger.info(
+                "[%s] Orchestrator suggested %s; scorer decided %s – using scorer",
+                document_id,
+                agent_state.orchestrator_routing,
+                confidence_score.decision,
+            )
+
         record.status = confidence_score.decision
         record.processed_at = datetime.utcnow()
         save_document(record)
 
         logger.info(
-            "[%s] Processing complete: status=%s overall_confidence=%.1f%%",
+            "[%s] Processing complete: status=%s overall_confidence=%.1f%% "
+            "orchestrator_steps=%d",
             document_id,
             record.status,
             confidence_score.overall_score,
+            agent_state.iterations,
         )
 
     except Exception as exc:

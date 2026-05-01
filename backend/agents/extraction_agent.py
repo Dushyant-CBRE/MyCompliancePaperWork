@@ -47,17 +47,31 @@ Return a single JSON object with this exact schema – no other text:
   "document_type_confidence":<0-100>,
   "vendor_name":             "<string or null>",
   "vendor_name_confidence":  <0-100>,
+  "certificate_number":      "<string or null>",
+  "certificate_number_confidence": <0-100>,
+  "next_service_date":       "<ISO 8601 date string or null>",
+  "next_service_date_confidence": <0-100>,
+  "overall_outcome":         "<string or null>",
+  "overall_outcome_confidence": <0-100>,
+  "client_name":             "<string or null>",
+  "client_name_confidence":  <0-100>,
+  "key_readings":            [{"name":"<param name>","value":"<value>","unit":"<unit or null>","status":"<Pass/Fail/Advisory or null>"}],
   "overall_extraction_confidence": <0-100>
 }
 
 Rules:
 - Set a field to null if the information cannot be found in the document.
 - Confidence 0 = not found / guessed; 100 = explicitly stated and unambiguous.
-- For inspection_date, use ISO 8601 format (YYYY-MM-DD). If only month/year is visible use YYYY-MM-01.
+- For inspection_date / next_service_date, use ISO 8601 format (YYYY-MM-DD). If only month/year is visible use YYYY-MM-01.
 - For site_name look for: "Site:", "Location:", "Property:", "Premises:" labels or letterhead addresses.
 - For ppm_reference look for: "Ref:", "Reference:", "Job No:", "PPM Ref:", "Work Order:" labels.
+- For certificate_number look for: "Certificate No:", "Cert No:", "Certificate Number:", "Certificate Ref:" labels.
+- For next_service_date look for: "Next Service:", "Next Inspection:", "Next Visit:", "Due Date:", "Review Date:" labels.
+- For overall_outcome look for: "Outcome:", "Result:", "Status:", "Conclusion:", "All satisfactory", "Pass", "Fail" statements.
+- For client_name look for: "Client:", "Customer:", "On behalf of:", "Prepared for:", "Building Owner:" labels.
+- For key_readings extract any tabular measurement data (e.g. pH, conductivity, inhibitor levels, temperature, pressure). Each reading should have name, value, unit, and pass/fail status if stated.
 - For document_type identify the maintenance category (Fire Safety, HVAC, Electrical Testing, \
-  Legionella, Lift, Gas Safety, etc.).
+  Legionella, Lift, Gas Safety, Water Treatment, etc.).
 - overall_extraction_confidence is the weighted average of individual confidences for fields \
   that were found (ignore null fields).
 """
@@ -87,7 +101,6 @@ def run_extraction_agent(document_text: str) -> ExtractedFields:
             ],
             response_format={"type": "json_object"},
             temperature=0.0,
-            max_tokens=800,
         )
 
         raw_json = response.choices[0].message.content or "{}"

@@ -2,13 +2,17 @@
 Application configuration loaded from environment variables.
 Fill in .env (copy from .env.example) before running.
 """
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+
+# Resolve .env relative to this file so it works regardless of cwd
+_ENV_FILE = Path(__file__).parent / ".env"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=False,
     )

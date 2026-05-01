@@ -88,10 +88,14 @@ def upload_pdf_to_blob(pdf_bytes: bytes, filename: str) -> tuple[str, str]:
         pass  # Already exists
 
     blob_client = container.get_blob_client(blob_name)
-    blob_client.upload_blob(pdf_bytes, overwrite=True)
-    blob_url = blob_client.url
+    try:
+        blob_client.upload_blob(pdf_bytes, overwrite=True)
+        blob_url = blob_client.url
+        logger.info("Uploaded blob: %s", blob_url)
+    except Exception as exc:
+        logger.warning("Blob upload failed (storage may be unreachable): %s – continuing without blob", exc)
+        blob_url = ""
 
-    logger.info("Uploaded blob: %s", blob_url)
     return document_id, blob_url
 
 
@@ -184,8 +188,11 @@ def save_document(record: DocumentRecord) -> None:
         logger.warning("Table save skipped (no client) – document_id=%s", record.document_id)
         return
     entity = _record_to_entity(record)
-    client.upsert_entity(entity)
-    logger.info("Saved document to table: %s [%s]", record.document_id, record.status)
+    try:
+        client.upsert_entity(entity)
+        logger.info("Saved document to table: %s [%s]", record.document_id, record.status)
+    except Exception as exc:
+        logger.warning("Table save failed (storage may be unreachable): %s – continuing", exc)
 
 
 def get_document(document_id: str) -> Optional[DocumentRecord]:

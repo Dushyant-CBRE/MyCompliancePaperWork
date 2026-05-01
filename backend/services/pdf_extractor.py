@@ -74,7 +74,6 @@ def _extract_text_with_vision(base64_images: list[str]) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": content},
         ],
-        max_tokens=4096,
         temperature=0.0,
     )
     return response.choices[0].message.content or ""

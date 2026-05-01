@@ -12,14 +12,21 @@ from __future__ import annotations
 import json
 import logging
 
+from datetime import date
+
 from backend.config import get_settings
 from backend.models.document import DocumentMetadata, ExtractedFields, ValidationResult
 from backend.utils.llm_client import get_llm_client
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = """\
+
+def _build_system_prompt() -> str:
+    today = date.today().isoformat()
+    return f"""\
 You are a compliance document validation specialist.
+Today's date is {today}. Use this when evaluating whether inspection_date is in the past.
+
 You will receive:
   1. "extracted" – fields pulled from the document by an AI extractor.
   2. "expected"  – metadata that the compliance officer provided at upload time.
@@ -28,7 +35,7 @@ Your task is to judge how well the extracted fields match the expected values
 and assess whether the document dates and inspector details look legitimate.
 
 Return a single JSON object with this exact schema – no other text:
-{
+{{
   "site_name_match":              <0-100>,
   "ppm_reference_match":          <0-100>,
   "date_valid":                   <true|false>,
@@ -37,24 +44,19 @@ Return a single JSON object with this exact schema – no other text:
   "inspector_validity_score":     <0-100>,
   "issues":                       ["<issue description>", ...],
   "overall_validation_confidence":<0-100>
-}
+}}
 
 Scoring rules:
-- site_name_match: 100 = exact (case-insensitive) match; 80 = abbreviation/alias match; \
-  0 = completely different.
+- site_name_match: 100 = exact (case-insensitive) match; 80 = abbreviation/alias match; 0 = completely different.
 - ppm_reference_match: 100 = exact; partial/reformatted = 60; missing = 0.
-- date_valid: true if inspection_date is a plausible past date (not in the future, \
-  not more than 5 years ago).
+- date_valid: true if inspection_date is on or before today ({today}) and not more than 5 years ago.
 - date_validity_score: 100 if date_valid; 0 if future date; 50 if date missing.
-- inspector_valid: true if inspector_name is present and looks like a real name \
-  (not "N/A", "Unknown", or empty).
+- inspector_valid: true if inspector_name is present and looks like a real name (not "N/A", "Unknown", or empty).
 - inspector_validity_score: 100 if valid; 0 if missing or placeholder.
 - issues: list any discrepancies, mismatches, or concerns (empty list if none).
 - overall_validation_confidence: weighted average:
-    (site_name_match * 0.35) + (ppm_reference_match * 0.30) + \
-    (date_validity_score * 0.20) + (inspector_validity_score * 0.15)
-- If an expected field was not provided (null), treat that field match as 70 \
-  (cannot confirm but not penalised).
+    (site_name_match * 0.35) + (ppm_reference_match * 0.30) + (date_validity_score * 0.20) + (inspector_validity_score * 0.15)
+- If an expected field was not provided (null), treat that field match as 70 (cannot confirm but not penalised).
 """
 
 
@@ -98,12 +100,11 @@ def run_validation_agent(
         response = client.chat.completions.create(
             model=settings.azure_openai_deployment_primary,
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": _build_system_prompt()},
                 {"role": "user", "content": user_content},
             ],
             response_format={"type": "json_object"},
             temperature=0.0,
-            max_tokens=600,
         )
 
         raw_json = response.choices[0].message.content or "{}"

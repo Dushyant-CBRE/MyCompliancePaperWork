@@ -87,7 +87,6 @@ def _call_llm(model_deployment: str, document_text: str) -> dict:
         ],
         response_format={"type": "json_object"},
         temperature=0.0,
-        max_tokens=1000,
     )
     raw_json = response.choices[0].message.content or "{}"
     return json.loads(raw_json)
