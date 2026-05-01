@@ -1,0 +1,273 @@
+"""
+Storage Service
+───────────────
+Handles all Azure Storage interactions:
+  - Blob Storage  : storing/retrieving raw PDF files
+  - Table Storage : persisting and querying document metadata/results
+
+The connection string is read from environment variables.
+When the connection string is empty (local dev without Azure), operations
+are silently skipped and a warning is logged so the rest of the pipeline
+still works.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import uuid
+from datetime import datetime
+from typing import Optional
+
+from backend.config import get_settings
+from backend.models.document import (
+    AnalyticsSummary,
+    DocumentRecord,
+    DocumentStatus,
+    RemedialClassification,
+)
+
+logger = logging.getLogger(__name__)
+
+
+# ── Lazy client helpers ───────────────────────────────────────────────────────
+
+def _get_blob_service_client():
+    """Return an Azure BlobServiceClient or None if not configured."""
+    try:
+        from azure.storage.blob import BlobServiceClient  # type: ignore
+        settings = get_settings()
+        if not settings.azure_storage_connection_string:
+            logger.warning("AZURE_STORAGE_CONNECTION_STRING not set – blob storage disabled")
+            return None
+        return BlobServiceClient.from_connection_string(settings.azure_storage_connection_string)
+    except ImportError:
+        logger.warning("azure-storage-blob not installed – blob storage disabled")
+        return None
+
+
+def _get_table_client(table_name: str):
+    """Return an Azure TableClient or None if not configured."""
+    try:
+        from azure.data.tables import TableServiceClient  # type: ignore
+        settings = get_settings()
+        if not settings.azure_storage_connection_string:
+            logger.warning("AZURE_STORAGE_CONNECTION_STRING not set – table storage disabled")
+            return None
+        service = TableServiceClient.from_connection_string(settings.azure_storage_connection_string)
+        # Create table if it doesn't exist
+        try:
+            service.create_table_if_not_exists(table_name)
+        except Exception:
+            pass
+        return service.get_table_client(table_name)
+    except ImportError:
+        logger.warning("azure-data-tables not installed – table storage disabled")
+        return None
+
+
+# ── Blob operations ───────────────────────────────────────────────────────────
+
+def upload_pdf_to_blob(pdf_bytes: bytes, filename: str) -> tuple[str, str]:
+    """
+    Upload a PDF to Blob Storage.
+    Returns (document_id, blob_url).
+    """
+    document_id = str(uuid.uuid4())
+    settings = get_settings()
+    blob_name = f"{document_id}/{filename}"
+
+    client = _get_blob_service_client()
+    if client is None:
+        logger.warning("Blob upload skipped (no client) – document_id=%s", document_id)
+        return document_id, ""
+
+    container = client.get_container_client(settings.azure_blob_container_name)
+    try:
+        container.create_container()
+    except Exception:
+        pass  # Already exists
+
+    blob_client = container.get_blob_client(blob_name)
+    blob_client.upload_blob(pdf_bytes, overwrite=True)
+    blob_url = blob_client.url
+
+    logger.info("Uploaded blob: %s", blob_url)
+    return document_id, blob_url
+
+
+def get_pdf_from_blob(document_id: str, filename: str) -> Optional[bytes]:
+    """Download a PDF from Blob Storage. Returns None if not found."""
+    settings = get_settings()
+    blob_name = f"{document_id}/{filename}"
+
+    client = _get_blob_service_client()
+    if client is None:
+        return None
+
+    blob_client = client.get_blob_client(
+        container=settings.azure_blob_container_name, blob=blob_name
+    )
+    try:
+        stream = blob_client.download_blob()
+        return stream.readall()
+    except Exception as exc:
+        logger.error("Blob download failed for %s: %s", blob_name, exc)
+        return None
+
+
+# ── Table operations ──────────────────────────────────────────────────────────
+
+def _record_to_entity(record: DocumentRecord) -> dict:
+    """Convert a DocumentRecord to an Azure Table entity dict."""
+    entity: dict = {
+        "PartitionKey": "documents",
+        "RowKey": record.document_id,
+        "filename": record.filename,
+        "blob_url": record.blob_url or "",
+        "status": record.status,
+        "uploaded_at": record.uploaded_at.isoformat(),
+        "processed_at": record.processed_at.isoformat() if record.processed_at else "",
+        # Nested objects serialised as JSON strings
+        "metadata_json": record.metadata.model_dump_json() if record.metadata else "",
+        "extracted_fields_json": record.extracted_fields.model_dump_json() if record.extracted_fields else "",
+        "validation_result_json": record.validation_result.model_dump_json() if record.validation_result else "",
+        "remedial_result_json": record.remedial_result.model_dump_json() if record.remedial_result else "",
+        "confidence_score_json": record.confidence_score.model_dump_json() if record.confidence_score else "",
+        "override_by": record.override_by or "",
+        "override_reason": record.override_reason or "",
+        "overridden_at": record.overridden_at.isoformat() if record.overridden_at else "",
+    }
+    return entity
+
+
+def _entity_to_record(entity: dict) -> DocumentRecord:
+    """Convert an Azure Table entity dict back to a DocumentRecord."""
+    from backend.models.document import (  # local import to avoid circular
+        ConfidenceScore,
+        DocumentMetadata,
+        ExtractedFields,
+        RemedialResult,
+        ValidationResult,
+    )
+
+    def _parse(json_str: str, model):
+        if not json_str:
+            return None
+        try:
+            return model.model_validate_json(json_str)
+        except Exception:
+            return None
+
+    return DocumentRecord(
+        document_id=entity["RowKey"],
+        filename=entity.get("filename", ""),
+        blob_url=entity.get("blob_url") or None,
+        status=entity.get("status", DocumentStatus.PENDING),
+        uploaded_at=datetime.fromisoformat(entity["uploaded_at"]),
+        processed_at=datetime.fromisoformat(entity["processed_at"]) if entity.get("processed_at") else None,
+        metadata=_parse(entity.get("metadata_json", ""), DocumentMetadata),
+        extracted_fields=_parse(entity.get("extracted_fields_json", ""), ExtractedFields),
+        validation_result=_parse(entity.get("validation_result_json", ""), ValidationResult),
+        remedial_result=_parse(entity.get("remedial_result_json", ""), RemedialResult),
+        confidence_score=_parse(entity.get("confidence_score_json", ""), ConfidenceScore),
+        override_by=entity.get("override_by") or None,
+        override_reason=entity.get("override_reason") or None,
+        overridden_at=datetime.fromisoformat(entity["overridden_at"]) if entity.get("overridden_at") else None,
+    )
+
+
+def save_document(record: DocumentRecord) -> None:
+    """Upsert a DocumentRecord to Table Storage."""
+    settings = get_settings()
+    client = _get_table_client(settings.azure_table_name)
+    if client is None:
+        logger.warning("Table save skipped (no client) – document_id=%s", record.document_id)
+        return
+    entity = _record_to_entity(record)
+    client.upsert_entity(entity)
+    logger.info("Saved document to table: %s [%s]", record.document_id, record.status)
+
+
+def get_document(document_id: str) -> Optional[DocumentRecord]:
+    """Fetch a single DocumentRecord by ID. Returns None if not found."""
+    settings = get_settings()
+    client = _get_table_client(settings.azure_table_name)
+    if client is None:
+        return None
+    try:
+        entity = client.get_entity(partition_key="documents", row_key=document_id)
+        return _entity_to_record(entity)
+    except Exception as exc:
+        logger.error("get_document failed for %s: %s", document_id, exc)
+        return None
+
+
+def list_documents(
+    status_filter: Optional[str] = None,
+    limit: int = 100,
+) -> list[DocumentRecord]:
+    """Return a list of documents, optionally filtered by status."""
+    settings = get_settings()
+    client = _get_table_client(settings.azure_table_name)
+    if client is None:
+        return []
+
+    query_filter = "PartitionKey eq 'documents'"
+    if status_filter:
+        query_filter += f" and status eq '{status_filter}'"
+
+    try:
+        entities = list(client.query_entities(query_filter, results_per_page=limit))
+        records = [_entity_to_record(e) for e in entities]
+        # Sort by uploaded_at descending
+        records.sort(key=lambda r: r.uploaded_at, reverse=True)
+        return records[:limit]
+    except Exception as exc:
+        logger.error("list_documents failed: %s", exc)
+        return []
+
+
+def get_analytics_summary() -> AnalyticsSummary:
+    """Compute aggregate analytics from all stored documents."""
+    records = list_documents(limit=1000)
+
+    summary = AnalyticsSummary(total_documents=len(records))
+    confidence_sum = 0.0
+    confidence_count = 0
+
+    for rec in records:
+        s = rec.status
+        if s == DocumentStatus.AUTO_APPROVED:
+            summary.auto_approved += 1
+        elif s == DocumentStatus.MANUAL_REVIEW:
+            summary.manual_review += 1
+        elif s == DocumentStatus.REQUIRES_ATTENTION:
+            summary.requires_attention += 1
+        elif s == DocumentStatus.APPROVED:
+            summary.approved += 1
+        elif s == DocumentStatus.REJECTED:
+            summary.rejected += 1
+
+        if rec.confidence_score:
+            confidence_sum += rec.confidence_score.overall_score
+            confidence_count += 1
+
+        if rec.remedial_result:
+            clf = rec.remedial_result.classification
+            if clf == RemedialClassification.PASS:
+                summary.remedial_pass += 1
+            elif clf == RemedialClassification.REMEDIAL_MINOR:
+                summary.remedial_minor += 1
+            elif clf == RemedialClassification.REMEDIAL_CRITICAL:
+                summary.remedial_critical += 1
+
+    if confidence_count:
+        summary.avg_confidence = round(confidence_sum / confidence_count, 2)
+
+    auto_and_approved = summary.auto_approved + summary.approved
+    if summary.total_documents:
+        summary.auto_approval_rate = round(
+            auto_and_approved / summary.total_documents * 100, 2
+        )
+
+    return summary
