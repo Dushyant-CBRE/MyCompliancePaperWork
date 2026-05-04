@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Clock, User } from 'lucide-react';
-import type { Exception, Severity } from '../../types';
+import type { Exception, Severity } from '../../types/exception-types';
 import { ConfidenceBar } from '../ConfidenceBar';
 
 function getSeverityStyle(severity: Severity) {

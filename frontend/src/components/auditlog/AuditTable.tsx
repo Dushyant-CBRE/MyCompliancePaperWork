@@ -1,4 +1,4 @@
-import type { AuditEntry } from '../../types';
+import type { AuditEntry } from '../../types/audit-types';
 
 interface AuditTableProps {
     entries: AuditEntry[];

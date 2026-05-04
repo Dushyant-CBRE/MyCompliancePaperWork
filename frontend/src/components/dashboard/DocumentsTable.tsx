@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Filter, Download, ArrowUpDown } from 'lucide-react';
-import type { Document } from '../../types';
+import type { Document } from '../../types/document-types';
 import { StatusBadge } from '../StatusBadge';
 import { ConfidenceBar } from '../ConfidenceBar';
 

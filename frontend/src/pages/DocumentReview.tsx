@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { ReviewDocument, ExtractedField, ValidationCheck, RemedialEvidence } from '../types';
+import type { ReviewDocument, ExtractedField, ValidationCheck, RemedialEvidence } from '../types/review-types';
 import { DocumentReviewHeader } from '../components/documentreview/DocumentReviewHeader';
 import { PDFViewerPanel } from '../components/documentreview/PDFViewerPanel';
 import { AnalysisPanel } from '../components/documentreview/AnalysisPanel';

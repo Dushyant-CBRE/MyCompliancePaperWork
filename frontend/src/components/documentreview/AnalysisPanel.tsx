@@ -1,4 +1,4 @@
-import type { ExtractedField, ValidationCheck, RemedialEvidence } from '../../types';
+import type { ExtractedField, ValidationCheck, RemedialEvidence } from '../../types/review-types';
 import { ExtractedFieldsTab } from './ExtractedFieldsTab';
 import { ValidationChecksTab } from './ValidationChecksTab';
 import { RemedialDetectionTab } from './RemedialDetectionTab';

@@ -1,6 +1,6 @@
 import { ArrowLeft, FileText, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { ReviewDocument } from '../../types';
+import type { ReviewDocument } from '../../types/review-types';
 
 interface DocumentReviewHeaderProps {
     doc: ReviewDocument;

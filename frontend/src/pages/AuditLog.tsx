@@ -1,4 +1,4 @@
-import type { AuditEntry } from '../types';
+import type { AuditEntry } from '../types/audit-types';
 import { PageHeader } from '../components/PageHeader';
 import { AuditToolbar } from '../components/auditlog/AuditToolbar';
 import { AuditTable } from '../components/auditlog/AuditTable';

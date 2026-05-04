@@ -1,4 +1,4 @@
-import type { Exception } from '../types';
+import type { Exception } from '../types/exception-types';
 import { PageHeader } from '../components/PageHeader';
 import { ExceptionStatCards } from '../components/exceptions/ExceptionStatCards';
 import { ExceptionCard } from '../components/exceptions/ExceptionCard';
