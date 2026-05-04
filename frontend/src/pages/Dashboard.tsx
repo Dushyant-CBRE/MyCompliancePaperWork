@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Document } from '../types';
+import type { Document } from '../types/document-types';
 import { PageHeader } from '../components/PageHeader';
 import { StatCards } from '../components/dashboard/StatCards';
 import { ProcessingPipeline } from '../components/dashboard/ProcessingPipeline';

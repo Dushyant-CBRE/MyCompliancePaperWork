@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import type { RemedialEvidence } from '../../types';
+import type { RemedialEvidence } from '../../types/review-types';
 
 interface RemedialDetectionTabProps {
     evidence: RemedialEvidence[];

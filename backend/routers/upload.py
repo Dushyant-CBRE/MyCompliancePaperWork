@@ -11,6 +11,7 @@ demo, synchronous processing is fine and simpler to demonstrate.
 """
 from __future__ import annotations
 
+from datetime import datetime
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
@@ -32,9 +33,10 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="PDF compliance document"),
     expected_site_name: str | None = Form(None),
-    expected_ppm_reference: str | None = Form(None),
+    expected_ppm_type: str | None = Form(None),
+    expected_document_date: datetime | None = Form(None),
     expected_document_type: str | None = Form(None),
-    submitted_by: str | None = Form(None),
+    expected_vendor_name: str | None = Form(None),
     notes: str | None = Form(None),
 ):
     """
@@ -46,7 +48,7 @@ async def upload_document(
     for the full result.
     """
     # Validate file type
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
+    if not file.filename or not expected_document_type == "pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
     pdf_bytes = await file.read()
@@ -62,9 +64,10 @@ async def upload_document(
 
     metadata = DocumentMetadata(
         expected_site_name=expected_site_name,
-        expected_ppm_reference=expected_ppm_reference,
+        expected_ppm_type=expected_ppm_type,
+        expected_document_date=expected_document_date,
         expected_document_type=expected_document_type,
-        submitted_by=submitted_by,
+        expected_vendor_name=expected_vendor_name,
         notes=notes,
     )
 

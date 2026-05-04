@@ -92,9 +92,10 @@ class ConfidenceScore(BaseModel):
 class DocumentMetadata(BaseModel):
     """Metadata supplied at upload time."""
     expected_site_name: Optional[str] = None
-    expected_ppm_reference: Optional[str] = None
+    expected_ppm_type: Optional[str] = None
+    expected_document_date: Optional[datetime] = None
     expected_document_type: Optional[str] = None
-    submitted_by: Optional[str] = None
+    expected_vendor_name: Optional[str] = None
     notes: Optional[str] = None
 
 

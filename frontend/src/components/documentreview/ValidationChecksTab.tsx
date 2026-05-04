@@ -1,5 +1,5 @@
 import { CheckCircle2, XCircle } from 'lucide-react';
-import type { ValidationCheck } from '../../types';
+import type { ValidationCheck } from '../../types/review-types';
 
 interface ValidationChecksTabProps {
     checks: ValidationCheck[];

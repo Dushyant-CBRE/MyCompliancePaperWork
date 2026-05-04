@@ -1,5 +1,5 @@
 import { CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
-import type { DocStatus } from '../types';
+import type { DocStatus } from '../types/document-types';
 
 function getStatusStyle(status: DocStatus) {
     switch (status) {

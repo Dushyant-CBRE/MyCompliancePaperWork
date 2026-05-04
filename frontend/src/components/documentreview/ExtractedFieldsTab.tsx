@@ -1,5 +1,5 @@
 import { Edit2 } from 'lucide-react';
-import type { ExtractedField } from '../../types';
+import type { ExtractedField } from '../../types/review-types';
 
 interface ExtractedFieldsTabProps {
     fields: ExtractedField[];
