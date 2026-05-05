@@ -17,17 +17,14 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # ── Azure OpenAI via CBRE WSO2 Proxy ────────────────────────────────────
-    # Base URL for the CBRE API Gateway proxy (SDK appends /openai/deployments/...)
-    azure_openai_endpoint: str = "https://api-test.cbre.com:443/t/digitaltech_us_edp/cbreopenaiendpoint/1/"
-    azure_openai_api_version: str = "2024-02-15-preview"
-    azure_openai_deployment_primary: str = "gpt4omni"
-    azure_openai_deployment_fallback: str = "gpt4omni"
+    # ── Anthropic Claude via Azure AI Foundry ──────────────────────────────
+    anthropic_api_key: str = ""
+    anthropic_endpoint: str = "https://admv-mogidbp0-eastus2.services.ai.azure.com/anthropic/"
+    anthropic_deployment: str = "claude-sonnet-4-6"
 
-    # ── WSO2 OAuth2 Client Credentials ───────────────────────────────────────
-    wso2_auth_url: str = "https://api-test.cbre.com:443/token"
-    wso2_client_id: str = ""
-    wso2_client_secret: str = ""
+    # Keep these so existing references in agents don't crash (mapped to deployment)
+    azure_openai_deployment_primary: str = "claude-sonnet-4-6"
+    azure_openai_deployment_fallback: str = "claude-sonnet-4-6"
 
     # ── Azure Storage (Blob + Table) ─────────────────────────────────────────
     azure_storage_connection_string: str = ""
