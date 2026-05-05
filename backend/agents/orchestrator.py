@@ -95,9 +95,10 @@ def run_orchestrator(
     metadata_str = "None provided."
     if metadata:
         metadata_str = json.dumps({
-            "expected_site_name": metadata.expected_site_name,
-            "expected_ppm_reference": metadata.expected_ppm_reference,
+            "expected_site_name":     metadata.expected_site_name,
+            "expected_ppm_type":      getattr(metadata, "expected_ppm_type", None),
             "expected_document_type": metadata.expected_document_type,
+            "expected_vendor_name":   getattr(metadata, "expected_vendor_name", None),
         })
 
     # Truncate document preview for the system message (full text goes to tools)

@@ -83,9 +83,10 @@ def run_validation_agent(
     expected_payload: dict = {}
     if metadata:
         expected_payload = {
-            "site_name": metadata.expected_site_name,
-            "ppm_reference": metadata.expected_ppm_reference,
+            "site_name":     metadata.expected_site_name,
+            "ppm_type":      getattr(metadata, "expected_ppm_type", None),
             "document_type": metadata.expected_document_type,
+            "vendor_name":   getattr(metadata, "expected_vendor_name", None),
         }
 
     user_content = (
@@ -112,6 +113,39 @@ def run_validation_agent(
         result = ValidationResult(
             **{k: v for k, v in data.items() if k in ValidationResult.model_fields}
         )
+
+        # ── Build structured checks list for the Review UI ────────────────
+        def _check(label: str, passed: bool, detail: str = "") -> dict:
+            return {"check": label, "status": "pass" if passed else "fail", "detail": detail}
+
+        checks = [
+            _check(
+                "Site name matches expected",
+                result.site_name_match >= 70,
+                f"Match score: {result.site_name_match:.0f}%",
+            ),
+            _check(
+                "PPM reference / type matches expected",
+                result.ppm_reference_match >= 70,
+                f"Match score: {result.ppm_reference_match:.0f}%",
+            ),
+            _check(
+                "Inspection date is valid",
+                result.date_valid,
+                "" if result.date_valid else "Date is missing, in the future, or too old",
+            ),
+            _check(
+                "Inspector name present and valid",
+                result.inspector_valid,
+                "" if result.inspector_valid else "Inspector name missing or appears invalid",
+            ),
+        ]
+        # Add one fail entry per issue flagged by the LLM
+        for issue in result.issues:
+            checks.append({"check": issue, "status": "fail", "detail": ""})
+
+        result.checks = checks
+
         logger.info(
             "Agent 2 result: site_match=%.0f%% ppm_match=%.0f%% date_valid=%s confidence=%.1f%%",
             result.site_name_match,

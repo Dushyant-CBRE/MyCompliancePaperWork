@@ -26,21 +26,23 @@ export function UploadPipelineCard({ currentStage, filename, fileSize, onOpenRev
             {/* Stage list */}
             <div className="space-y-2">
                 {PIPELINE_STAGES.map((stage, idx) => {
-                    const isComplete = idx < currentIndex;
-                    const isCurrent = idx === currentIndex;
+                    const isDone = currentStage === 'Completed'
+                        ? true
+                        : idx < currentIndex;
+                    const isCurrent = currentStage !== 'Completed' && idx === currentIndex;
 
                     return (
                         <div
                             key={stage}
                             className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                                isComplete
+                                isDone
                                     ? 'bg-accent/10'
                                     : isCurrent
                                       ? 'bg-primary/10'
                                       : 'bg-muted/30'
                             }`}
                         >
-                            {isComplete ? (
+                            {isDone ? (
                                 <CheckCircle className="w-5 h-5 text-accent flex-shrink-0" />
                             ) : isCurrent ? (
                                 <Loader2 className="w-5 h-5 text-primary animate-spin flex-shrink-0" />
@@ -49,7 +51,7 @@ export function UploadPipelineCard({ currentStage, filename, fileSize, onOpenRev
                             )}
                             <span
                                 className={`text-sm font-medium ${
-                                    isComplete
+                                    isDone
                                         ? 'text-accent-foreground'
                                         : isCurrent
                                           ? 'text-primary'

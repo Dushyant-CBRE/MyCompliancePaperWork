@@ -136,6 +136,20 @@ def run_remedial_detection_agent(document_text: str) -> RemedialResult:
             reasoning=data.get("reasoning", ""),
         )
 
+        # ── Build structured evidence list for the Review UI ──────────────
+        evidence: list[dict] = []
+        for item in result.critical_items:
+            evidence.append({"text": item, "page": 0, "severity": "High"})
+        for item in result.minor_items:
+            evidence.append({"text": item, "page": 0, "severity": "Medium"})
+        # Add findings not already covered as advisory Low severity
+        critical_set = set(result.critical_items)
+        minor_set = set(result.minor_items)
+        for f in result.findings:
+            if f not in critical_set and f not in minor_set:
+                evidence.append({"text": f, "page": 0, "severity": "Low"})
+        result.evidence = evidence
+
         logger.info(
             "Agent 3 result: classification=%s confidence=%.1f%% critical_items=%d",
             result.classification,

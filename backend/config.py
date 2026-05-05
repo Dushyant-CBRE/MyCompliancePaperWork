@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # ── Azure Storage (Blob + Table) ─────────────────────────────────────────
     azure_storage_connection_string: str = ""
     azure_blob_container_name: str = "mypapercompliance"
-    azure_table_name: str = "documents"
+    azure_table_name: str = "MyPaperCompliance"
 
     # ── Processing settings ──────────────────────────────────────────────────
     confidence_auto_approve_threshold: float = 85.0

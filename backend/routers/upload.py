@@ -48,7 +48,7 @@ async def upload_document(
     for the full result.
     """
     # Validate file type
-    if not file.filename or not expected_document_type == "pdf":
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
     pdf_bytes = await file.read()

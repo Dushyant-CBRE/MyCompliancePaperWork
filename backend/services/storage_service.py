@@ -167,25 +167,55 @@ def get_document_text(document_id: str) -> Optional[str]:
 
 def _record_to_entity(record: DocumentRecord) -> dict:
     """Convert a DocumentRecord to an Azure Table entity dict."""
+    # Flat queryable columns – avoids deserialising JSON just to list/filter
+    ef = record.extracted_fields
+    cs = record.confidence_score
+    rr = record.remedial_result
+    ins = record.insights
+
     entity: dict = {
         "PartitionKey": "documents",
         "RowKey": record.document_id,
         "filename": record.filename,
         "blob_url": record.blob_url or "",
-        "status": record.status,
+        "status": record.status.value if isinstance(record.status, DocumentStatus) else str(record.status),
         "uploaded_at": record.uploaded_at.isoformat(),
         "processed_at": record.processed_at.isoformat() if record.processed_at else "",
-        # Nested objects serialised as JSON strings
+        # ── Flat queryable columns (populated after processing) ──────────────
+        "site_name": (ef.site_name or "") if ef else "",
+        "inspection_date": (ef.inspection_date or "") if ef else "",
+        "next_service_date": (ef.next_service_date or "") if ef else "",
+        "inspector_name": (ef.inspector_name or "") if ef else "",
+        "vendor_name": (ef.vendor_name or "") if ef else "",
+        "document_type": (ef.document_type or "") if ef else "",
+        "overall_outcome": (ef.overall_outcome or "") if ef else "",
+        "certificate_number": (ef.certificate_number or "") if ef else "",
+        "overall_confidence": cs.overall_score if cs else 0.0,
+        "remedial_classification": (rr.classification.value if rr and rr.classification else ""),
+        "compliance_status": (ins.compliance_status or "") if ins else "",
+        "risk_level": (ins.risk_level or "") if ins else "",
+        "is_overdue": ins.is_overdue if ins else False,
+        # ── Full JSON blobs (for detail view) ────────────────────────────────
         "metadata_json": record.metadata.model_dump_json() if record.metadata else "",
         "extracted_fields_json": record.extracted_fields.model_dump_json() if record.extracted_fields else "",
         "validation_result_json": record.validation_result.model_dump_json() if record.validation_result else "",
         "remedial_result_json": record.remedial_result.model_dump_json() if record.remedial_result else "",
         "confidence_score_json": record.confidence_score.model_dump_json() if record.confidence_score else "",
+        "agent_state_json": record.agent_state.model_dump_json() if record.agent_state else "",
+        "insights_json": record.insights.model_dump_json() if record.insights else "",
+        # ── Officer override ─────────────────────────────────────────────────
         "override_by": record.override_by or "",
         "override_reason": record.override_reason or "",
         "overridden_at": record.overridden_at.isoformat() if record.overridden_at else "",
     }
     return entity
+
+
+def _normalise_status(raw: str) -> str:
+    """Strip legacy 'DocumentStatus.' prefix stored by old code."""
+    if isinstance(raw, str) and raw.startswith("DocumentStatus."):
+        raw = raw.split(".", 1)[1].lower()
+    return raw
 
 
 def _entity_to_record(entity: dict) -> DocumentRecord:
@@ -206,11 +236,13 @@ def _entity_to_record(entity: dict) -> DocumentRecord:
         except Exception:
             return None
 
+    from backend.models.document import AgentState, DocumentInsights  # avoid circular
+
     return DocumentRecord(
         document_id=entity["RowKey"],
         filename=entity.get("filename", ""),
         blob_url=entity.get("blob_url") or None,
-        status=entity.get("status", DocumentStatus.PENDING),
+        status=_normalise_status(entity.get("status", "pending")),
         uploaded_at=datetime.fromisoformat(entity["uploaded_at"]),
         processed_at=datetime.fromisoformat(entity["processed_at"]) if entity.get("processed_at") else None,
         metadata=_parse(entity.get("metadata_json", ""), DocumentMetadata),
@@ -218,6 +250,8 @@ def _entity_to_record(entity: dict) -> DocumentRecord:
         validation_result=_parse(entity.get("validation_result_json", ""), ValidationResult),
         remedial_result=_parse(entity.get("remedial_result_json", ""), RemedialResult),
         confidence_score=_parse(entity.get("confidence_score_json", ""), ConfidenceScore),
+        agent_state=_parse(entity.get("agent_state_json", ""), AgentState),
+        insights=_parse(entity.get("insights_json", ""), DocumentInsights),
         override_by=entity.get("override_by") or None,
         override_reason=entity.get("override_reason") or None,
         overridden_at=datetime.fromisoformat(entity["overridden_at"]) if entity.get("overridden_at") else None,

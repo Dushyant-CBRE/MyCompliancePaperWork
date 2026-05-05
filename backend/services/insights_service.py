@@ -58,6 +58,20 @@ def _compliance_status(remedial: RemedialResult, validation: ValidationResult) -
     return "Compliant"
 
 
+def _sla_remaining(days: Optional[int]) -> Optional[str]:
+    """Convert days_until_next_service into a human-readable SLA string."""
+    if days is None:
+        return None
+    if days < 0:
+        return f"Overdue by {abs(days)}d"
+    if days == 0:
+        return "Due today"
+    if days < 2:
+        hours = days * 24
+        return f"{hours}h"
+    return f"{days}d"
+
+
 def generate_insights(
     extracted: ExtractedFields,
     validation: ValidationResult,
@@ -114,5 +128,6 @@ def generate_insights(
         fields_total=len(_EXPECTED_FIELDS),
         completeness_pct=completeness,
         flags=flags,
+        sla_remaining=_sla_remaining(days_until_next),
         score_breakdown=score_breakdown,
     )

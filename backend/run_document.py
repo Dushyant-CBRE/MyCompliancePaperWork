@@ -40,7 +40,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run the agentic compliance pipeline on a PDF.")
     parser.add_argument("pdf", type=Path, help="Path to the PDF document")
     parser.add_argument("--site",     default=None, help="Expected site name")
-    parser.add_argument("--ppm",      default=None, help="Expected PPM reference")
+    parser.add_argument("--ppm",      default=None, help="Expected PPM type")
     parser.add_argument("--doctype",  default=None, help="Expected document type")
     parser.add_argument("--officer",  default="test-run", help="Submitted by (default: test-run)")
     parser.add_argument("--json",     action="store_true", help="Output machine-readable JSON instead of plain text")
@@ -69,9 +69,8 @@ def main() -> None:
     from backend.models.document import DocumentMetadata
     metadata = DocumentMetadata(
         expected_site_name=args.site,
-        expected_ppm_reference=args.ppm,
+        expected_ppm_type=args.ppm,
         expected_document_type=args.doctype,
-        submitted_by=args.officer,
     )
     if any([args.site, args.ppm, args.doctype]):
         _hr("Expected Metadata")

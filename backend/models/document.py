@@ -94,6 +94,9 @@ class ValidationResult(BaseModel):
     inspector_validity_score: float = 0.0
     issues: list[str] = Field(default_factory=list)
     overall_validation_confidence: float = 0.0
+    # Structured pass/fail checks surfaced in the Review UI
+    # Each item: {check: str, status: "pass"|"fail", detail: str}
+    checks: list[dict] = Field(default_factory=list)
 
 
 class RemedialResult(BaseModel):
@@ -104,6 +107,9 @@ class RemedialResult(BaseModel):
     critical_items: list[str] = Field(default_factory=list)
     minor_items: list[str] = Field(default_factory=list)
     reasoning: str = ""
+    # Structured evidence list surfaced in the Review UI
+    # Each item: {text: str, page: int, severity: "High"|"Medium"|"Low"}
+    evidence: list[dict] = Field(default_factory=list)
 
 
 # ── Orchestrator / Agentic loop models ────────────────────────────────────────
@@ -158,6 +164,9 @@ class DocumentInsights(BaseModel):
 
     # Key flags surfaced for the officer
     flags: list[str] = Field(default_factory=list)
+
+    # SLA countdown string for the Review header (e.g. "4h 23m", "Overdue")
+    sla_remaining: Optional[str] = None
 
     # Confidence breakdown for sparkline / radar chart
     score_breakdown: list[dict] = Field(default_factory=list)  # [{label, score, weight}]
