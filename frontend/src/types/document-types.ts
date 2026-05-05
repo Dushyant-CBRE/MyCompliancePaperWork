@@ -27,3 +27,22 @@ export interface UploadResponse {
     filename: string;
     message: string;
 }
+
+export interface AnalyticsSummary {
+    total_documents: number;
+    auto_approved: number;
+    manual_review: number;
+    requires_attention: number;
+    approved: number;
+    rejected: number;
+    avg_confidence: number;
+    remedial_pass: number;
+    remedial_minor: number;
+    remedial_critical: number;
+    auto_approval_rate: number;
+    avg_processing_time_seconds: number;
+    processing_buckets: { time: string; count: number }[];
+    confidence_distribution: { range: string; count: number }[];
+    site_breakdown: { site: string; approved: number; review: number; remedial: number }[];
+    ppm_distribution: { type: string; count: number }[];
+}

@@ -1,0 +1,42 @@
+﻿{
+  "total_documents": 74,
+  "auto_approved": 42,
+  "manual_review": 18,
+  "requires_attention": 8,
+  "approved": 4,
+  "rejected": 2,
+  "avg_confidence": 76.4,
+  "remedial_pass": 55,
+  "remedial_minor": 12,
+  "remedial_critical": 7,
+  "auto_approval_rate": 62.16,
+  "avg_processing_time_seconds": 107.3,
+  "processing_buckets": [
+    { "time": "00:00", "count": 3 },
+    { "time": "04:00", "count": 7 },
+    { "time": "08:00", "count": 15 },
+    { "time": "12:00", "count": 22 },
+    { "time": "16:00", "count": 18 },
+    { "time": "20:00", "count": 9 }
+  ],
+  "confidence_distribution": [
+    { "range": "0-20",   "count": 2 },
+    { "range": "20-40",  "count": 5 },
+    { "range": "40-60",  "count": 12 },
+    { "range": "60-80",  "count": 28 },
+    { "range": "80-100", "count": 37 }
+  ],
+  "site_breakdown": [
+    { "site": "Dallas HQ", "approved": 12, "review": 4, "remedial": 2 },
+    { "site": "Chicago Tower", "approved": 9, "review": 6, "remedial": 1 },
+    { "site": "NYC Plaza", "approved": 15, "review": 3, "remedial": 3 },
+    { "site": "LA Campus", "approved": 7, "review": 5, "remedial": 0 },
+    { "site": "Houston Center", "approved": 10, "review": 2, "remedial": 1 }
+  ],
+  "ppm_distribution": [
+    { "type": "Fire Safety", "count": 24 },
+    { "type": "Electrical",  "count": 18 },
+    { "type": "HVAC",        "count": 14 },
+    { "type": "Elevator",    "count": 9 }
+  ]
+}

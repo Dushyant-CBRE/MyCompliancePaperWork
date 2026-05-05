@@ -238,6 +238,11 @@ class AnalyticsSummary(BaseModel):
     remedial_minor: int = 0
     remedial_critical: int = 0
     auto_approval_rate: float = 0.0
+    # Chart data
+    processing_buckets: list[dict] = Field(default_factory=list)     # [{time, count}]
+    confidence_distribution: list[dict] = Field(default_factory=list) # [{range, count}]
+    site_breakdown: list[dict] = Field(default_factory=list)          # [{site, approved, review, remedial}]
+    ppm_distribution: list[dict] = Field(default_factory=list)        # [{type, count}]
 
 
 # ── Reviewer Q&A (RAG) models ─────────────────────────────────────────────────
@@ -258,3 +263,4 @@ class AskResponse(BaseModel):
     answer: str
     sources: list[CitedChunk] = Field(default_factory=list)
     document_id: str
+    avg_processing_time_seconds: float = 0.0
