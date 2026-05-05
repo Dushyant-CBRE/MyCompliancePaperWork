@@ -33,38 +33,49 @@ class ExtractedFields(BaseModel):
     """Output from Agent 1 – Extraction Agent."""
     site_name: Optional[str] = None
     site_name_confidence: float = 0.0
+    site_name_source: Optional[str] = None           # verbatim sentence it was found in
 
     ppm_reference: Optional[str] = None
     ppm_reference_confidence: float = 0.0
+    ppm_reference_source: Optional[str] = None
 
     inspection_date: Optional[str] = None
     inspection_date_confidence: float = 0.0
+    inspection_date_source: Optional[str] = None
 
     inspector_name: Optional[str] = None
     inspector_name_confidence: float = 0.0
+    inspector_name_source: Optional[str] = None
 
     equipment_id: Optional[str] = None
     equipment_id_confidence: float = 0.0
+    equipment_id_source: Optional[str] = None
 
     document_type: Optional[str] = None
     document_type_confidence: float = 0.0
+    document_type_source: Optional[str] = None
 
     vendor_name: Optional[str] = None
     vendor_name_confidence: float = 0.0
+    vendor_name_source: Optional[str] = None
 
     # ── Extended fields ───────────────────────────────────────────────────────
     certificate_number: Optional[str] = None
     certificate_number_confidence: float = 0.0
+    certificate_number_source: Optional[str] = None
 
     next_service_date: Optional[str] = None          # ISO 8601
     next_service_date_confidence: float = 0.0
+    next_service_date_source: Optional[str] = None
 
     overall_outcome: Optional[str] = None            # e.g. "Satisfactory", "Failed"
     overall_outcome_confidence: float = 0.0
+    overall_outcome_source: Optional[str] = None
 
     page_count: Optional[int] = None                 # total pages in document
     client_name: Optional[str] = None                # building owner / client
     client_name_confidence: float = 0.0
+    client_name_source: Optional[str] = None
 
     # Key readings / measurements extracted verbatim (e.g. chemical levels)
     key_readings: list[dict] = Field(default_factory=list)   # [{name, value, unit, status}]
@@ -149,7 +160,7 @@ class DocumentInsights(BaseModel):
     flags: list[str] = Field(default_factory=list)
 
     # Confidence breakdown for sparkline / radar chart
-    score_breakdown: dict = Field(default_factory=dict)  # {label, score, weight}
+    score_breakdown: list[dict] = Field(default_factory=list)  # [{label, score, weight}]
 
 
 # ── Document models ───────────────────────────────────────────────────────────
@@ -218,3 +229,23 @@ class AnalyticsSummary(BaseModel):
     remedial_minor: int = 0
     remedial_critical: int = 0
     auto_approval_rate: float = 0.0
+
+
+# ── Reviewer Q&A (RAG) models ─────────────────────────────────────────────────
+
+class CitedChunk(BaseModel):
+    """A passage from the original document cited as evidence for an answer."""
+    chunk_index: int
+    text: str
+    relevance_score: float = 0.0   # 0-1 keyword overlap score
+
+
+class AskRequest(BaseModel):
+    question: str
+
+
+class AskResponse(BaseModel):
+    question: str
+    answer: str
+    sources: list[CitedChunk] = Field(default_factory=list)
+    document_id: str

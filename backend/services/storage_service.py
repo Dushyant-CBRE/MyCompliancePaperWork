@@ -119,6 +119,50 @@ def get_pdf_from_blob(document_id: str, filename: str) -> Optional[bytes]:
         return None
 
 
+def save_document_text(document_id: str, text: str) -> None:
+    """Store the extracted plain text of a document as {document_id}/document_text.txt."""
+    settings = get_settings()
+    blob_name = f"{document_id}/document_text.txt"
+
+    client = _get_blob_service_client()
+    if client is None:
+        logger.warning("Text save skipped (no blob client) – document_id=%s", document_id)
+        return
+
+    container = client.get_container_client(settings.azure_blob_container_name)
+    try:
+        container.create_container()
+    except Exception:
+        pass
+
+    try:
+        container.get_blob_client(blob_name).upload_blob(
+            text.encode("utf-8"), overwrite=True
+        )
+        logger.info("Saved document text blob: %s", blob_name)
+    except Exception as exc:
+        logger.warning("Text save failed for %s: %s – continuing", blob_name, exc)
+
+
+def get_document_text(document_id: str) -> Optional[str]:
+    """Retrieve the stored plain text for a document. Returns None if not found."""
+    settings = get_settings()
+    blob_name = f"{document_id}/document_text.txt"
+
+    client = _get_blob_service_client()
+    if client is None:
+        return None
+
+    blob_client = client.get_blob_client(
+        container=settings.azure_blob_container_name, blob=blob_name
+    )
+    try:
+        return blob_client.download_blob().readall().decode("utf-8")
+    except Exception as exc:
+        logger.warning("Text retrieval failed for %s: %s", blob_name, exc)
+        return None
+
+
 # ── Table operations ──────────────────────────────────────────────────────────
 
 def _record_to_entity(record: DocumentRecord) -> dict:

@@ -30,7 +30,7 @@ from backend.models.document import (
 from backend.services.confidence_scorer import calculate_confidence
 from backend.services.insights_service import generate_insights
 from backend.services.pdf_extractor import extract_text_from_pdf
-from backend.services.storage_service import save_document, upload_pdf_to_blob
+from backend.services.storage_service import save_document, save_document_text, upload_pdf_to_blob
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,9 @@ def process_document(
         # ── Step 2: PDF Text Extraction ──────────────────────────────────────
         logger.info("[%s] Step 2: Extracting text from PDF", document_id)
         document_text = extract_text_from_pdf(pdf_bytes)
+
+        # Persist text to blob so the Q&A endpoint can retrieve it later
+        save_document_text(document_id, document_text)
 
         # ── Step 3: Agentic Orchestrator ─────────────────────────────────────
         # The orchestrator runs an agentic loop: it calls extraction, validation,

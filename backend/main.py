@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import get_settings
 from backend.routers import analytics, documents, upload
+from backend.routers.ask import router as ask_router
 from backend.utils.logger import setup_logging
 
 setup_logging()
@@ -50,6 +51,7 @@ app.add_middleware(
 app.include_router(upload.router)
 app.include_router(documents.router)
 app.include_router(analytics.router)
+app.include_router(ask_router)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

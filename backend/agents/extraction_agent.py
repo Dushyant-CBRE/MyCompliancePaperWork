@@ -35,26 +35,37 @@ Return a single JSON object with this exact schema – no other text:
 {
   "site_name":               "<string or null>",
   "site_name_confidence":    <0-100>,
+  "site_name_source":        "<verbatim sentence/phrase from the document that contains this value, or null>",
   "ppm_reference":           "<string or null>",
   "ppm_reference_confidence":<0-100>,
+  "ppm_reference_source":    "<verbatim sentence/phrase or null>",
   "inspection_date":         "<ISO 8601 date string or null>",
   "inspection_date_confidence":<0-100>,
+  "inspection_date_source":  "<verbatim sentence/phrase or null>",
   "inspector_name":          "<string or null>",
   "inspector_name_confidence":<0-100>,
+  "inspector_name_source":   "<verbatim sentence/phrase or null>",
   "equipment_id":            "<string or null>",
   "equipment_id_confidence": <0-100>,
+  "equipment_id_source":     "<verbatim sentence/phrase or null>",
   "document_type":           "<string or null>",
   "document_type_confidence":<0-100>,
+  "document_type_source":    "<verbatim sentence/phrase or null>",
   "vendor_name":             "<string or null>",
   "vendor_name_confidence":  <0-100>,
+  "vendor_name_source":      "<verbatim sentence/phrase or null>",
   "certificate_number":      "<string or null>",
   "certificate_number_confidence": <0-100>,
+  "certificate_number_source": "<verbatim sentence/phrase or null>",
   "next_service_date":       "<ISO 8601 date string or null>",
   "next_service_date_confidence": <0-100>,
+  "next_service_date_source": "<verbatim sentence/phrase or null>",
   "overall_outcome":         "<string or null>",
   "overall_outcome_confidence": <0-100>,
+  "overall_outcome_source":  "<verbatim sentence/phrase or null>",
   "client_name":             "<string or null>",
   "client_name_confidence":  <0-100>,
+  "client_name_source":      "<verbatim sentence/phrase or null>",
   "key_readings":            [{"name":"<param name>","value":"<value>","unit":"<unit or null>","status":"<Pass/Fail/Advisory or null>"}],
   "overall_extraction_confidence": <0-100>
 }
@@ -62,6 +73,7 @@ Return a single JSON object with this exact schema – no other text:
 Rules:
 - Set a field to null if the information cannot be found in the document.
 - Confidence 0 = not found / guessed; 100 = explicitly stated and unambiguous.
+- For source quotes: copy the shortest verbatim phrase or sentence from the document that contains the value. Keep it under 150 characters. Set to null if field is null.
 - For inspection_date / next_service_date, use ISO 8601 format (YYYY-MM-DD). If only month/year is visible use YYYY-MM-01.
 - For site_name look for: "Site:", "Location:", "Property:", "Premises:" labels or letterhead addresses.
 - For ppm_reference look for: "Ref:", "Reference:", "Job No:", "PPM Ref:", "Work Order:" labels.
