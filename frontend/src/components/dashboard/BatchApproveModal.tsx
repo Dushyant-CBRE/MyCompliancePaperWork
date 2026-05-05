@@ -1,12 +1,13 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 
 interface BatchApproveModalProps {
     eligibleCount: number;
+    isLoading?: boolean;
     onClose: () => void;
     onConfirm: () => void;
 }
 
-export function BatchApproveModal({ eligibleCount, onClose, onConfirm }: BatchApproveModalProps) {
+export function BatchApproveModal({ eligibleCount, isLoading = false, onClose, onConfirm }: BatchApproveModalProps) {
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-card rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -30,15 +31,18 @@ export function BatchApproveModal({ eligibleCount, onClose, onConfirm }: BatchAp
                 <div className="flex gap-3">
                     <button
                         onClick={onClose}
-                        className="flex-1 px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-sm font-medium"
+                        disabled={isLoading}
+                        className="flex-1 px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-sm font-medium disabled:opacity-50"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={onConfirm}
-                        className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+                        disabled={isLoading}
+                        className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                        Approve All
+                        {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {isLoading ? 'Approving...' : 'Approve All'}
                     </button>
                 </div>
             </div>

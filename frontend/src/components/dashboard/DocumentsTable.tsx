@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Filter, Download, ArrowUpDown } from 'lucide-react';
-import type { Document } from '../../types/document-types';
+import type { Document } from '../../types';
 import { StatusBadge } from '../StatusBadge';
 import { ConfidenceBar } from '../ConfidenceBar';
 
@@ -10,6 +10,7 @@ interface DocumentsTableProps {
 }
 
 export function DocumentsTable({ documents, onApproveAll }: DocumentsTableProps) {
+    const navigate = useNavigate();
     return (
         <div className="bg-card border border-border rounded-lg">
             {/* Toolbar */}
@@ -72,15 +73,11 @@ export function DocumentsTable({ documents, onApproveAll }: DocumentsTableProps)
                         {documents.map((doc) => (
                             <tr
                                 key={doc.id}
+                                onClick={() => navigate(`/document/${doc.id}`)}
                                 className="hover:bg-muted/30 transition-colors cursor-pointer"
                             >
-                                <td className="px-6 py-4 text-sm">
-                                    <Link
-                                        to={`/document/${doc.id}`}
-                                        className="hover:text-primary transition-colors font-medium"
-                                    >
-                                        {doc.site}
-                                    </Link>
+                                <td className="px-6 py-4 text-sm font-medium">
+                                    {doc.site}
                                 </td>
                                 <td className="px-6 py-4 text-sm">{doc.vendor}</td>
                                 <td className="px-6 py-4 text-sm">{doc.ppmType}</td>

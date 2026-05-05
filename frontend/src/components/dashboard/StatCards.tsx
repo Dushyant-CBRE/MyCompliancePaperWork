@@ -1,16 +1,22 @@
 import { StatCard } from '../StatCard';
+import type { DashboardStats } from '../../types/document-types';
 
-const stats = [
-    { label: 'Total Documents', value: '248', change: '+12 today' },
-    { label: 'Auto-Approved', value: '186', change: '75% rate' },
-    { label: 'Needs Review', value: '42', change: '17% rate' },
-    { label: 'Remedial Detected', value: '8', change: 'Critical: 2' },
-];
+interface StatCardsProps {
+    stats: DashboardStats;
+}
 
-export function StatCards() {
+export function StatCards({ stats }: StatCardsProps) {
+    const total = stats.totalDocuments || 1; // avoid division by zero
+    const statItems = [
+        { label: 'Total Documents', value: String(stats.totalDocuments), change: '+0 today' },
+        { label: 'Auto-Approved', value: String(stats.autoApproved), change: `${Math.round(stats.autoApproved / total * 100)}% rate` },
+        { label: 'Needs Review', value: String(stats.needsReview), change: `${Math.round(stats.needsReview / total * 100)}% rate` },
+        { label: 'Remedial Detected', value: String(stats.remedialDetected), change: `Critical: ${stats.criticalCount}` },
+    ];
+
     return (
         <div className="grid grid-cols-4 gap-4 mb-6">
-            {stats.map((stat) => (
+            {statItems.map((stat) => (
                 <StatCard key={stat.label} {...stat} />
             ))}
         </div>
