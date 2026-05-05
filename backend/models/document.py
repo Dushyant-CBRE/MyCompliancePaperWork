@@ -238,6 +238,7 @@ class AnalyticsSummary(BaseModel):
     remedial_minor: int = 0
     remedial_critical: int = 0
     auto_approval_rate: float = 0.0
+    avg_processing_time_seconds: float = 0.0
     # Chart data
     processing_buckets: list[dict] = Field(default_factory=list)     # [{time, count}]
     confidence_distribution: list[dict] = Field(default_factory=list) # [{range, count}]
@@ -263,7 +264,6 @@ class AskResponse(BaseModel):
     answer: str
     sources: list[CitedChunk] = Field(default_factory=list)
     document_id: str
-    avg_processing_time_seconds: float = 0.0
 
 
 # ── Dashboard models ──────────────────────────────────────────────────────────

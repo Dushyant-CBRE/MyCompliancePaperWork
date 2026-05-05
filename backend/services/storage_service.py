@@ -287,6 +287,21 @@ def get_document(document_id: str) -> Optional[DocumentRecord]:
         return None
 
 
+def _load_dashboard_defaults() -> list[DocumentRecord]:
+    """Load fallback document list from backend/data/dashboard_defaults.json."""
+    import json
+    import os
+
+    defaults_path = os.path.join(os.path.dirname(__file__), "..", "data", "dashboard_defaults.json")
+    try:
+        with open(defaults_path, encoding="utf-8-sig") as f:
+            data = json.load(f)
+        return [DocumentRecord.model_validate(item) for item in data]
+    except Exception as exc:
+        logger.warning("Failed to load dashboard defaults: %s", exc)
+        return []
+
+
 def list_documents(
     status_filter: Optional[str] = None,
     limit: int = 100,
@@ -295,7 +310,12 @@ def list_documents(
     settings = get_settings()
     client = _get_table_client(settings.azure_table_name)
     if client is None:
-        return []
+        # Fallback to defaults JSON when Azure Storage is not configured
+        records = _load_dashboard_defaults()
+        if status_filter:
+            records = [r for r in records if r.status == status_filter]
+        records.sort(key=lambda r: r.uploaded_at, reverse=True)
+        return records[:limit]
 
     query_filter = "PartitionKey eq 'documents'"
     if status_filter:
