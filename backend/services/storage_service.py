@@ -278,15 +278,79 @@ def list_documents(
         return []
 
 
+def _load_analytics_defaults() -> dict:
+    """Load fallback chart data from backend/data/analytics_defaults.json."""
+    import json
+    import os
+
+    defaults_path = os.path.join(os.path.dirname(__file__), "..", "data", "analytics_defaults.json")
+    try:
+        with open(defaults_path, encoding="utf-8-sig") as f:
+            return json.load(f)
+    except Exception:
+        return {
+            "processing_buckets": [],
+            "confidence_distribution": [],
+            "site_breakdown": [],
+            "ppm_distribution": [],
+        }
+
+
+def _init_accumulators(defaults: dict) -> tuple[dict[str, int], dict[str, int], dict, dict]:
+    """
+    Return zero-initialised accumulators for chart computation, with bucket
+    keys sourced directly from analytics_defaults.json:
+      (hour_buckets, conf_buckets, site_map, ppm_map)
+    """
+    hour_buckets: dict[str, int] = {
+        entry["time"]: 0 for entry in defaults.get("processing_buckets", [])
+    }
+    conf_buckets: dict[str, int] = {
+        entry["range"]: 0 for entry in defaults.get("confidence_distribution", [])
+    }
+    site_map: dict[str, dict[str, int]] = {}
+    ppm_map: dict[str, int] = {}
+    return hour_buckets, conf_buckets, site_map, ppm_map
+
+
 def get_analytics_summary() -> AnalyticsSummary:
     """Compute aggregate analytics from all stored documents."""
     records = list_documents(limit=1000)
 
+    defaults = _load_analytics_defaults()
+    hour_buckets, conf_buckets, site_map, ppm_map = _init_accumulators(defaults)
+
+    # When no real documents exist, return the defaults directly
+    if not records:
+        return AnalyticsSummary(
+            total_documents=defaults.get("total_documents", 0),
+            auto_approved=defaults.get("auto_approved", 0),
+            manual_review=defaults.get("manual_review", 0),
+            requires_attention=defaults.get("requires_attention", 0),
+            approved=defaults.get("approved", 0),
+            rejected=defaults.get("rejected", 0),
+            avg_confidence=defaults.get("avg_confidence", 0.0),
+            remedial_pass=defaults.get("remedial_pass", 0),
+            remedial_minor=defaults.get("remedial_minor", 0),
+            remedial_critical=defaults.get("remedial_critical", 0),
+            auto_approval_rate=defaults.get("auto_approval_rate", 0.0),
+            avg_processing_time_seconds=defaults.get("avg_processing_time_seconds", 0.0),
+            processing_buckets=defaults.get("processing_buckets", []),
+            confidence_distribution=defaults.get("confidence_distribution", []),
+            site_breakdown=defaults.get("site_breakdown", []),
+            ppm_distribution=defaults.get("ppm_distribution", []),
+        )
+
     summary = AnalyticsSummary(total_documents=len(records))
     confidence_sum = 0.0
     confidence_count = 0
+    processing_time_sum = 0.0
+    processing_time_count = 0
+
+    now_utc = datetime.utcnow()
 
     for rec in records:
+        # ── Status counters ────────────────────────────────────────────
         s = rec.status
         if s == DocumentStatus.AUTO_APPROVED:
             summary.auto_approved += 1
@@ -299,10 +363,24 @@ def get_analytics_summary() -> AnalyticsSummary:
         elif s == DocumentStatus.REJECTED:
             summary.rejected += 1
 
+        # ── Confidence ────────────────────────────────────────────────
         if rec.confidence_score:
-            confidence_sum += rec.confidence_score.overall_score
+            score = rec.confidence_score.overall_score
+            confidence_sum += score
             confidence_count += 1
 
+            if score <= 20:
+                conf_buckets["0-20"] += 1
+            elif score <= 40:
+                conf_buckets["20-40"] += 1
+            elif score <= 60:
+                conf_buckets["40-60"] += 1
+            elif score <= 80:
+                conf_buckets["60-80"] += 1
+            else:
+                conf_buckets["80-100"] += 1
+
+        # ── Remedial ──────────────────────────────────────────────────
         if rec.remedial_result:
             clf = rec.remedial_result.classification
             if clf == RemedialClassification.PASS:
@@ -312,13 +390,104 @@ def get_analytics_summary() -> AnalyticsSummary:
             elif clf == RemedialClassification.REMEDIAL_CRITICAL:
                 summary.remedial_critical += 1
 
+        # ── Processing time ───────────────────────────────────────────
+        if rec.processed_at and rec.uploaded_at:
+            delta = (rec.processed_at - rec.uploaded_at).total_seconds()
+            if delta >= 0:
+                processing_time_sum += delta
+                processing_time_count += 1
+
+        # ── Processing-time 24h bucket ────────────────────────────────
+        try:
+            uploaded = rec.uploaded_at
+            age_hours = (now_utc - uploaded).total_seconds() / 3600
+            if age_hours <= 24:
+                hour = uploaded.hour
+                if hour < 4:
+                    hour_buckets["00:00"] += 1
+                elif hour < 8:
+                    hour_buckets["04:00"] += 1
+                elif hour < 12:
+                    hour_buckets["08:00"] += 1
+                elif hour < 16:
+                    hour_buckets["12:00"] += 1
+                elif hour < 20:
+                    hour_buckets["16:00"] += 1
+                else:
+                    hour_buckets["20:00"] += 1
+        except Exception:
+            pass
+
+        # ── Site breakdown ────────────────────────────────────────────
+        site = (
+            (rec.extracted_fields.site_name if rec.extracted_fields else None)
+            or (rec.metadata.expected_site_name if rec.metadata else None)
+            or "Unknown"
+        )
+        if site not in site_map:
+            site_map[site] = {"approved": 0, "review": 0, "remedial": 0}
+        if s in (DocumentStatus.AUTO_APPROVED, DocumentStatus.APPROVED):
+            site_map[site]["approved"] += 1
+        elif rec.remedial_result and rec.remedial_result.classification in (
+            RemedialClassification.REMEDIAL_MINOR,
+            RemedialClassification.REMEDIAL_CRITICAL,
+        ):
+            site_map[site]["remedial"] += 1
+        else:
+            site_map[site]["review"] += 1
+
+        # ── PPM distribution ──────────────────────────────────────────
+        ppm = (
+            (rec.extracted_fields.document_type if rec.extracted_fields else None)
+            or (rec.metadata.expected_ppm_type if rec.metadata else None)
+            or "Other"
+        )
+        ppm_map[ppm] = ppm_map.get(ppm, 0) + 1
+
+    # ── Finalise scalar fields ─────────────────────────────────────────
     if confidence_count:
         summary.avg_confidence = round(confidence_sum / confidence_count, 2)
+
+    if processing_time_count:
+        summary.avg_processing_time_seconds = round(
+            processing_time_sum / processing_time_count, 1
+        )
 
     auto_and_approved = summary.auto_approved + summary.approved
     if summary.total_documents:
         summary.auto_approval_rate = round(
             auto_and_approved / summary.total_documents * 100, 2
         )
+
+    # ── Build chart lists (fall back to defaults when empty) ──────────
+    any_in_24h = any(v > 0 for v in hour_buckets.values())
+    summary.processing_buckets = (
+        [{"time": k, "count": v} for k, v in hour_buckets.items()]
+        if any_in_24h
+        else defaults.get("processing_buckets", [])
+    )
+
+    any_conf = any(v > 0 for v in conf_buckets.values())
+    summary.confidence_distribution = (
+        [{"range": k, "count": v} for k, v in conf_buckets.items()]
+        if any_conf
+        else defaults.get("confidence_distribution", [])
+    )
+
+    summary.site_breakdown = (
+        [{"site": k, **v} for k, v in site_map.items() if k != "Unknown"]
+        if site_map
+        else defaults.get("site_breakdown", [])
+    )
+
+    summary.ppm_distribution = (
+        sorted(
+            [{"type": k, "count": v} for k, v in ppm_map.items()],
+            key=lambda x: x["count"],
+            reverse=True,
+        )
+        if ppm_map
+        else defaults.get("ppm_distribution", [])
+    )
 
     return summary

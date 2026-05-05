@@ -1,18 +1,18 @@
-const ppmTypes = [
-    { type: 'Fire Safety', count: 89, color: 'bg-primary' },
-    { type: 'Electrical', count: 67, color: 'bg-accent' },
-    { type: 'HVAC', count: 54, color: 'bg-yellow-500' },
-    { type: 'Elevator', count: 38, color: 'bg-blue-500' },
-];
+interface PPMDistributionCardProps {
+    data: { type: string; count: number }[];
+}
 
-const TOTAL = 248;
-
-export function PPMDistributionCard() {
+export function PPMDistributionCard({ data }: PPMDistributionCardProps) {
+    const total = data.reduce((sum, d) => sum + d.count, 0) || 1;
+    const COLORS = [
+        'bg-primary', 'bg-accent', 'bg-yellow-500', 'bg-blue-500',
+        'bg-purple-500', 'bg-pink-500', 'bg-orange-500',
+    ];
     return (
         <div className="bg-card border border-border rounded-lg p-6">
             <h3 className="mb-4">PPM Type Distribution</h3>
             <div className="space-y-3">
-                {ppmTypes.map((ppm) => (
+                {data.map((ppm, idx) => (
                     <div key={ppm.type}>
                         <div className="flex items-center justify-between mb-1 text-sm">
                             <span>{ppm.type}</span>
@@ -20,8 +20,8 @@ export function PPMDistributionCard() {
                         </div>
                         <div className="bg-muted rounded-full h-2">
                             <div
-                                className={`h-full rounded-full ${ppm.color}`}
-                                style={{ width: `${(ppm.count / TOTAL) * 100}%` }}
+                                className={`h-full rounded-full ${COLORS[idx % COLORS.length]}`}
+                                style={{ width: `${(ppm.count / total) * 100}%` }}
                             />
                         </div>
                     </div>
