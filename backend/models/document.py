@@ -264,3 +264,47 @@ class AskResponse(BaseModel):
     sources: list[CitedChunk] = Field(default_factory=list)
     document_id: str
     avg_processing_time_seconds: float = 0.0
+
+
+# ── Dashboard models ──────────────────────────────────────────────────────────
+
+class DashboardDocumentSummary(BaseModel):
+    """Lightweight document summary for the dashboard table/feed."""
+    document_id: str
+    filename: str
+    status: DocumentStatus
+    site_name: Optional[str] = None
+    document_type: Optional[str] = None
+    inspection_date: Optional[str] = None
+    next_service_date: Optional[str] = None
+    overall_confidence: Optional[float] = None
+    remedial_classification: Optional[str] = None
+    compliance_status: Optional[str] = None
+    risk_level: Optional[str] = None
+    is_overdue: bool = False
+    uploaded_at: datetime
+    processed_at: Optional[datetime] = None
+
+
+class DashboardResponse(BaseModel):
+    """Aggregated dashboard data loaded directly from Azure Table Storage."""
+    # ── KPI counters ──────────────────────────────────────────────────────────
+    total_documents: int = 0
+    pending: int = 0
+    processing: int = 0
+    auto_approved: int = 0
+    manual_review: int = 0
+    requires_attention: int = 0
+    approved: int = 0
+    rejected: int = 0
+
+    # ── Compliance / quality stats ────────────────────────────────────────────
+    avg_confidence: float = 0.0
+    overdue_count: int = 0
+    remedial_pass: int = 0
+    remedial_minor: int = 0
+    remedial_critical: int = 0
+
+    # ── Document feeds ────────────────────────────────────────────────────────
+    recent_documents: list[DashboardDocumentSummary] = Field(default_factory=list)
+    attention_documents: list[DashboardDocumentSummary] = Field(default_factory=list)

@@ -17,6 +17,11 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
+    # ── Anthropic (Azure-hosted Claude) ─────────────────────────────────────
+    anthropic_api_key: str = ""
+    anthropic_endpoint: str = ""
+    anthropic_deployment: str = "claude-sonnet-4-6"
+
     # ── Azure OpenAI via CBRE WSO2 Proxy ────────────────────────────────────
     # Base URL for the CBRE API Gateway proxy (SDK appends /openai/deployments/...)
     azure_openai_endpoint: str = "https://api-test.cbre.com:443/t/digitaltech_us_edp/cbreopenaiendpoint/1/"

@@ -20,6 +20,7 @@ from backend.config import get_settings
 from backend.routers import analytics, documents, upload
 from backend.routers.ask import router as ask_router
 from backend.routers.audit import router as audit_router
+from backend.routers.dashboard import router as dashboard_router
 from backend.routers.exceptions import router as exceptions_router
 from backend.utils.logger import setup_logging
 
@@ -56,6 +57,7 @@ app.include_router(analytics.router)
 app.include_router(ask_router)
 app.include_router(audit_router)
 app.include_router(exceptions_router)
+app.include_router(dashboard_router)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
