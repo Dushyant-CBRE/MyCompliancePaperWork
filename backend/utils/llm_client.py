@@ -1,115 +1,161 @@
 """
-LLM client using the CBRE WSO2 API Gateway proxy for Azure OpenAI.
+LLM client using Anthropic Claude via Azure AI Foundry.
 
-Bypasses the openai SDK entirely and uses plain httpx, since the gateway
-requires Bearer token auth (not api-key) and the SDK URL construction
-conflicts with WSO2 routing.
+Wraps AnthropicFoundry to expose the same interface the agents use:
+    client.chat.completions.create(model, messages, tools, tool_choice, temperature)
 
-Auth flow:
-  1. POST {WSO2_AUTH_URL} with grant_type=client_credentials → Bearer token
-  2. Token is cached and refreshed automatically before expiry.
-  3. Every outbound request carries  Authorization: Bearer <token>
+Anthropic differences handled here transparently:
+  - system message extracted from messages list and passed separately
+  - tool schemas converted from OpenAI function-calling format → Anthropic tool format
+  - tool_choice mapped (auto → auto, required → any)
+  - response wrapped in the same SimpleNamespace shape agents already consume
+  - tool_calls on responses converted to the same SimpleNamespace shape
 """
 from __future__ import annotations
 
-import threading
-import time
 import json
-from types import SimpleNamespace
+import logging
 from functools import lru_cache
+from types import SimpleNamespace
 
 import httpx
 
 from backend.config import get_settings
 
+logger = logging.getLogger(__name__)
 
-class _WSO2TokenManager:
-    """Thread-safe OAuth2 client-credentials token cache."""
 
-    def __init__(self, token_url: str, client_id: str, client_secret: str) -> None:
-        self._token_url = token_url
-        self._client_id = client_id
-        self._client_secret = client_secret
-        self._token: str = ""
-        self._expires_at: float = 0.0
-        self._lock = threading.Lock()
+def _openai_tools_to_anthropic(tools: list[dict]) -> list[dict]:
+    """Convert OpenAI function-calling schema → Anthropic tools format."""
+    result = []
+    for t in tools:
+        fn = t.get("function", {})
+        result.append({
+            "name": fn["name"],
+            "description": fn.get("description", ""),
+            "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
+        })
+    return result
 
-    def get_token(self) -> str:
-        with self._lock:
-            if not self._token or time.monotonic() >= self._expires_at:
-                self._refresh()
-        return self._token
 
-    def _refresh(self) -> None:
-        resp = httpx.post(
-            self._token_url,
-            data={"grant_type": "client_credentials"},
-            auth=(self._client_id, self._client_secret),
-            timeout=30,
-        )
-        resp.raise_for_status()
-        payload = resp.json()
-        self._token = payload["access_token"]
-        self._expires_at = time.monotonic() + payload.get("expires_in", 3600) - 60
+def _map_tool_choice(tool_choice) -> dict:
+    if tool_choice == "required" or tool_choice == "any":
+        return {"type": "any"}
+    if isinstance(tool_choice, dict) and "function" in tool_choice:
+        return {"type": "tool", "name": tool_choice["function"]["name"]}
+    return {"type": "auto"}
+
+
+def _wrap_response(response) -> SimpleNamespace:
+    """
+    Wrap an Anthropic Message into the OpenAI-compatible SimpleNamespace
+    that all agents expect:
+      result.choices[0].message.content    → str | None
+      result.choices[0].message.tool_calls → list[SimpleNamespace] | None
+      result.choices[0].finish_reason      → str
+    """
+    text_content = ""
+    tool_calls = []
+
+    for block in response.content:
+        if block.type == "text":
+            text_content += block.text
+        elif block.type == "tool_use":
+            tool_calls.append(
+                SimpleNamespace(
+                    id=block.id,
+                    type="function",
+                    function=SimpleNamespace(
+                        name=block.name,
+                        arguments=json.dumps(block.input),
+                    ),
+                )
+            )
+
+    finish_reason = "stop" if response.stop_reason == "end_turn" else response.stop_reason
+    message = SimpleNamespace(
+        content=text_content or None,
+        role="assistant",
+        tool_calls=tool_calls if tool_calls else None,
+    )
+    return SimpleNamespace(
+        choices=[SimpleNamespace(message=message, finish_reason=finish_reason)],
+        model=response.model,
+    )
 
 
 class _ChatCompletions:
-    """Minimal chat.completions.create() compatible with the openai SDK interface."""
+    """Anthropic-backed chat.completions.create() compatible with the OpenAI SDK interface."""
 
-    def __init__(self, base_url: str, api_version: str, token_mgr: _WSO2TokenManager) -> None:
-        self._base_url = base_url.rstrip("/")
-        self._api_version = api_version
-        self._token_mgr = token_mgr
+    def __init__(self, client) -> None:
+        self._client = client
 
-    def create(self, model: str, messages: list, **kwargs) -> SimpleNamespace:
-        url = (
-            f"{self._base_url}/openai/deployments/{model}"
-            f"/chat/completions?api-version={self._api_version}"
-        )
-        body: dict = {"messages": messages}
-        # Pass through supported kwargs
-        for key in ("temperature", "response_format", "max_completion_tokens", "top_p", "tools", "tool_choice"):
-            if key in kwargs:
-                body[key] = kwargs[key]
+    def create(self, model: str, messages: list[dict], **kwargs) -> SimpleNamespace:
+        # ── Split system message out (Anthropic takes it separately) ────────
+        system = ""
+        filtered: list[dict] = []
+        for m in messages:
+            if m["role"] == "system":
+                system += m["content"]
+            else:
+                filtered.append(m)
 
-        resp = httpx.post(
-            url,
-            headers={
-                "Authorization": f"Bearer {self._token_mgr.get_token()}",
-                "Content-Type": "application/json",
-            },
-            json=body,
-            timeout=120,
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        # ── Convert messages to Anthropic format ───────────────────────────
+        anthropic_msgs: list[dict] = []
+        for m in filtered:
+            role = m["role"]
 
-        # Wrap response to match openai SDK shape: r.choices[0].message.content
-        choices = []
-        for c in data.get("choices", []):
-            msg_data = c.get("message", {})
-            # Parse tool_calls if present (agentic tool-use response)
-            tool_calls_raw = msg_data.get("tool_calls")
-            tool_calls = None
-            if tool_calls_raw:
-                tool_calls = [
-                    SimpleNamespace(
-                        id=tc.get("id"),
-                        type=tc.get("type", "function"),
-                        function=SimpleNamespace(
-                            name=tc["function"]["name"],
-                            arguments=tc["function"]["arguments"],
-                        ),
-                    )
-                    for tc in tool_calls_raw
-                ]
-            msg = SimpleNamespace(
-                content=msg_data.get("content", ""),
-                role=msg_data.get("role", "assistant"),
-                tool_calls=tool_calls,
-            )
-            choices.append(SimpleNamespace(message=msg, finish_reason=c.get("finish_reason")))
-        return SimpleNamespace(choices=choices, model=data.get("model", model))
+            if role == "assistant":
+                blocks = []
+                if m.get("content"):
+                    blocks.append({"type": "text", "text": m["content"]})
+                for tc in (m.get("tool_calls") or []):
+                    try:
+                        inp = json.loads(tc["function"]["arguments"] or "{}")
+                    except (json.JSONDecodeError, KeyError):
+                        inp = {}
+                    blocks.append({
+                        "type": "tool_use",
+                        "id": tc["id"],
+                        "name": tc["function"]["name"],
+                        "input": inp,
+                    })
+                if blocks:
+                    anthropic_msgs.append({"role": "assistant", "content": blocks})
+
+            elif role == "tool":
+                # OpenAI tool result → Anthropic tool_result block in a user turn
+                anthropic_msgs.append({
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": m.get("tool_call_id", ""),
+                        "content": str(m.get("content", "")),
+                    }],
+                })
+
+            else:
+                anthropic_msgs.append({"role": role, "content": m["content"]})
+
+        # ── Build call kwargs ─────────────────────────────────────────────
+        call_kwargs: dict = {
+            "model": model,
+            "max_tokens": kwargs.get("max_completion_tokens", 4096),
+            "messages": anthropic_msgs,
+        }
+        if system:
+            call_kwargs["system"] = system
+
+        tools_raw = kwargs.get("tools")
+        if tools_raw:
+            call_kwargs["tools"] = _openai_tools_to_anthropic(tools_raw)
+            call_kwargs["tool_choice"] = _map_tool_choice(kwargs.get("tool_choice", "auto"))
+
+        temp = kwargs.get("temperature", 1.0)
+        call_kwargs["temperature"] = max(0.0, min(1.0, float(temp)))
+
+        response = self._client.messages.create(**call_kwargs)
+        return _wrap_response(response)
 
 
 class _ChatResource:
@@ -117,24 +163,26 @@ class _ChatResource:
         self.completions = completions
 
 
-class CBREProxyClient:
-    """Drop-in replacement for openai.AzureOpenAI using direct httpx calls."""
+class AnthropicFoundryClient:
+    """Drop-in replacement for the old CBREProxyClient, backed by AnthropicFoundry."""
 
     def __init__(self) -> None:
         settings = get_settings()
-        token_mgr = _WSO2TokenManager(
-            token_url=settings.wso2_auth_url,
-            client_id=settings.wso2_client_id,
-            client_secret=settings.wso2_client_secret,
+        try:
+            from anthropic import AnthropicFoundry  # type: ignore
+        except ImportError as exc:
+            raise ImportError(
+                "anthropic package not installed. Run: pip install anthropic"
+            ) from exc
+
+        raw_client = AnthropicFoundry(
+            api_key=settings.anthropic_api_key,
+            base_url=settings.anthropic_endpoint,
+            http_client=httpx.Client(verify=False),
         )
-        completions = _ChatCompletions(
-            base_url=settings.azure_openai_endpoint,
-            api_version=settings.azure_openai_api_version,
-            token_mgr=token_mgr,
-        )
-        self.chat = _ChatResource(completions)
+        self.chat = _ChatResource(_ChatCompletions(raw_client))
 
 
 @lru_cache(maxsize=1)
-def get_llm_client() -> CBREProxyClient:
-    return CBREProxyClient()
+def get_llm_client() -> AnthropicFoundryClient:
+    return AnthropicFoundryClient()

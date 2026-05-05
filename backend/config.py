@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     azure_openai_deployment_primary: str = "gpt4omni"
     azure_openai_deployment_fallback: str = "gpt4omni"
 
+    # Keep these so existing references in agents don't crash (mapped to deployment)
+    azure_openai_deployment_primary: str = "claude-sonnet-4-6"
+    azure_openai_deployment_fallback: str = "claude-sonnet-4-6"
+
     # ── WSO2 OAuth2 Client Credentials ───────────────────────────────────────
     wso2_auth_url: str = "https://api-test.cbre.com:443/token"
     wso2_client_id: str = ""
