@@ -27,6 +27,7 @@ from backend.models.document import (
 from backend.services.storage_service import (
     get_document,
     get_pdf_from_blob,
+    get_pdf_from_blob_url,
     list_documents,
     save_document,
 )
@@ -159,4 +160,37 @@ def get_document_pdf(document_id: str):
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{record.filename}"'},
+    )
+
+
+@router.get("/{document_id}/file")
+def get_document_file(document_id: str):
+    """
+    Stream the raw PDF for document preview using the blob_url stored on the record.
+    GET /api/documents/{id}/file
+    """
+    record = get_document(document_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Document '{document_id}' not found.")
+
+    if not record.blob_url:
+        raise HTTPException(
+            status_code=404,
+            detail="No file is associated with this document.",
+        )
+
+    pdf_bytes = get_pdf_from_blob(document_id, record.filename)
+    if pdf_bytes is None:
+        raise HTTPException(
+            status_code=404,
+            detail="File could not be retrieved from storage. It may have been deleted.",
+        )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{record.filename}"',
+            "Cache-Control": "private, max-age=300",
+        },
     )
