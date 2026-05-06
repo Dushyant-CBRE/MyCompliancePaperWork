@@ -245,7 +245,7 @@ def extract_text_with_prebuilt(pdf_bytes: bytes) -> Optional[str]:
         client = _get_client()
         logger.info("Content Understanding: submitting to prebuilt-documentAnalysis")
 
-        poller = client.begin_analyze_document(
+        poller = client.begin_analyze_binary(
             analyzer_id="prebuilt-document",
             binary_input=pdf_bytes,
             content_type="application/pdf",
@@ -275,10 +275,9 @@ def extract_text_with_prebuilt(pdf_bytes: bytes) -> Optional[str]:
 
         full_text = "\n".join(lines)
         logger.info(
-            "Prebuilt analyzer extracted %d chars, %d KV pairs, %d tables",
+            "Prebuilt analyzer extracted %d chars, %d KV pairs",
             len(full_text),
-            len(kv_pairs),
-            len(tables),
+            len(fields),
         )
         return full_text
 
