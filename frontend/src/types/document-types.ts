@@ -11,6 +11,8 @@ export interface Document {
     confidence: number;
     flags: string[];
     remedial: boolean;
+    complianceStatus: string | null;
+    riskLevel: string | null;
 }
 
 export interface UploadMetadata {
@@ -200,4 +202,5 @@ export interface DashboardStats {
     approved: number;
     needsReview: number;
     rejected: number;
+    remedialDetected: number;
 }

@@ -28,6 +28,7 @@ export function Dashboard() {
                 if (f === 'Approved') return s === 'approved' || s === 'auto-approved' || s === 'auto_approved';
                 if (f === 'Needs Review') return s === 'needs review' || s === 'manual_review' || s === 'remedial detected' || s === 'requires_attention';
                 if (f === 'Rejected') return s === 'rejected';
+                if (f === 'Remedial Detected') return d.remedial === true;
                 return false;
             });
           })
@@ -55,6 +56,7 @@ export function Dashboard() {
         approved: rawRecords.filter(r => r.status === 'auto_approved' || r.status === 'approved').length,
         needsReview: rawRecords.filter(r => r.status === 'manual_review' || r.status === 'requires_attention' || r.status === 'pending' || r.status === 'processing').length,
         rejected: rawRecords.filter(r => r.status === 'rejected').length,
+        remedialDetected: rawRecords.filter(r => r.remedial_result?.classification === 'REMEDIAL_MINOR' || r.remedial_result?.classification === 'REMEDIAL_CRITICAL').length,
     };
 
     const eligibleCount = documents.filter(d => d.confidence >= 85 && d.status !== 'Approved').length;

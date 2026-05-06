@@ -71,5 +71,7 @@ export function mapDocumentRecord(record: DocumentRecord): Document {
         remedial:
             rem?.classification === 'REMEDIAL_MINOR' ||
             rem?.classification === 'REMEDIAL_CRITICAL',
+        complianceStatus: record.insights?.compliance_status ?? null,
+        riskLevel: record.insights?.risk_level ?? null,
     };
 }

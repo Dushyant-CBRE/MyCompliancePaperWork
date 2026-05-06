@@ -3,7 +3,7 @@ interface StatCardProps {
     value: string;
     change: string;
     isSelected?: boolean;
-    selectedColor?: 'green' | 'yellow' | 'red' | 'blue';
+    selectedColor?: 'green' | 'yellow' | 'red' | 'blue' | 'orange';
     onClick?: () => void;
 }
 
@@ -12,6 +12,7 @@ const colorMap = {
     yellow: { ring: 'ring-yellow-400/40', border: 'border-yellow-500', text: 'text-yellow-600', bg: 'bg-yellow-50' },
     red:    { ring: 'ring-red-400/40',    border: 'border-red-500',    text: 'text-red-600',    bg: 'bg-red-50' },
     blue:   { ring: 'ring-blue-400/40',   border: 'border-blue-500',   text: 'text-blue-600',   bg: 'bg-blue-50' },
+    orange: { ring: 'ring-orange-400/40', border: 'border-orange-500', text: 'text-orange-600', bg: 'bg-orange-50' },
 };
 
 export function StatCard({ label, value, change, isSelected, selectedColor = 'blue', onClick }: StatCardProps) {

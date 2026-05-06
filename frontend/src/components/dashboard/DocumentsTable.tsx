@@ -75,7 +75,7 @@ export function DocumentsTable({ documents, onApproveAll, onRefresh, onHoverStat
                                 Confidence
                             </th>
                             <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">
-                                Flags
+                                Insights
                             </th>
                         </tr>
                     </thead>
@@ -101,20 +101,26 @@ export function DocumentsTable({ documents, onApproveAll, onRefresh, onHoverStat
                                     <ConfidenceBar confidence={doc.confidence} />
                                 </td>
                                 <td className="px-6 py-4">
-                                    {doc.flags.length > 0 ? (
-                                        <div className="flex flex-wrap gap-1">
-                                            {doc.flags.map((flag) => (
-                                                <span
-                                                    key={flag}
-                                                    className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs"
-                                                >
-                                                    {flag}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <span className="text-muted-foreground text-sm">None</span>
-                                    )}
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {doc.complianceStatus && (
+                                            <span className="px-2 py-0.5 bg-red-50 text-red-700 rounded-full border border-red-200 text-xs font-medium">
+                                                {doc.complianceStatus}
+                                            </span>
+                                        )}
+                                        {doc.riskLevel && (
+                                            <span className="px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full border border-orange-200 text-xs font-medium">
+                                                Risk: {doc.riskLevel}
+                                            </span>
+                                        )}
+                                        {doc.remedial && (
+                                            <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full border border-purple-200 text-xs font-medium">
+                                                Remedial Detected
+                                            </span>
+                                        )}
+                                        {!doc.complianceStatus && !doc.riskLevel && !doc.remedial && (
+                                            <span className="text-muted-foreground text-sm">—</span>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
                         ))}
