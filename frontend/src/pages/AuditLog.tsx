@@ -8,9 +8,9 @@ const mockAuditEntries: AuditEntry[] = [
         id: '1',
         timestamp: '2026-04-22 14:32:18',
         user: 'Priya Sharma',
-        action: 'Override',
+        action: 'Rejected',
         document: 'Fire_Safety_PPM_DLF_2026-04-15.pdf',
-        details: "Changed status from 'Remedial Detected' to 'Approved'",
+        details: "Changed status to 'Rejected'",
         reason: 'Remedial misclassified',
         trainingFeedback: true,
     },
@@ -18,7 +18,7 @@ const mockAuditEntries: AuditEntry[] = [
         id: '2',
         timestamp: '2026-04-22 13:15:42',
         user: 'System (AI)',
-        action: 'Auto-Approved',
+        action: 'Approved',
         document: 'Electrical_PPM_Udyog_Vihar_2026-04-18.pdf',
         details: 'Confidence: 92%, All validation checks passed',
         reason: null,
@@ -38,9 +38,9 @@ const mockAuditEntries: AuditEntry[] = [
         id: '4',
         timestamp: '2026-04-22 11:23:55',
         user: 'System (AI)',
-        action: 'Remedial Detected',
+        action: 'Needs Review',
         document: 'Fire_Safety_PPM_DLF_2026-04-12.pdf',
-        details: "Critical keywords found: 'immediate action required'",
+        details: "Keywords found: 'immediate action required'",
         reason: null,
         trainingFeedback: false,
     },
@@ -61,7 +61,7 @@ export function AuditLog() {
         <div className="p-6">
             <PageHeader
                 title="Audit Log"
-                subtitle="Complete decision history and override tracking"
+                subtitle="Complete decision history and action tracking"
             />
             <div className="bg-card border border-border rounded-lg">
                 <AuditToolbar />

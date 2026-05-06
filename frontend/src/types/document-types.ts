@@ -1,4 +1,4 @@
-export type DocStatus = 'Auto-Approved' | 'Approved' | 'Needs Review' | 'Remedial Detected';
+export type DocStatus = 'Approved' | 'Rejected' | 'Needs Review';
 
 export interface Document {
     id: string;
@@ -197,8 +197,7 @@ export interface OverrideRequest {
 
 export interface DashboardStats {
     totalDocuments: number;
-    autoApproved: number;
+    approved: number;
     needsReview: number;
-    remedialDetected: number;
-    criticalCount: number;
+    rejected: number;
 }

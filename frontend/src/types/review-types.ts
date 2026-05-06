@@ -40,3 +40,14 @@ export interface ReviewResponse {
     reviewedAt: string;
     reviewedBy?: string;
 }
+
+export interface AuditData {
+    modelDecision: string;
+    processingTime: string;
+    timestamp: string;
+    extractionScore: number;
+    validationScore: number;
+    remedialScore: number;
+    iterations?: number;
+    toolsCalled?: string[];
+}

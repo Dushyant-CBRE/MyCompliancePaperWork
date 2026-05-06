@@ -1,8 +1,8 @@
 interface QualitySafetyCardProps {
-    criticalRemedial: number;
+    needsReviewCount: number;
 }
 
-export function QualitySafetyCard({ criticalRemedial }: QualitySafetyCardProps) {
+export function QualitySafetyCard({ needsReviewCount }: QualitySafetyCardProps) {
     return (
         <div className="bg-card border border-border rounded-lg p-6">
             <h3 className="mb-4">Quality &amp; Safety</h3>
@@ -16,10 +16,10 @@ export function QualitySafetyCard({ criticalRemedial }: QualitySafetyCardProps) 
                 </div>
                 <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                     <div>
-                        <p>Critical Remedial Detected</p>
+                        <p>Needs Review</p>
                         <p className="text-sm text-muted-foreground mt-1">Last 30 days</p>
                     </div>
-                    <p>{criticalRemedial}</p>
+                    <p>{needsReviewCount}</p>
                 </div>
                 <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                     <div>

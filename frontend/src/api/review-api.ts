@@ -7,6 +7,8 @@ import type {
 } from '../types/review-types';
 import type { DocumentRecord } from '../types/document-types';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
 export interface ReviewDocumentDetail {
     doc: ReviewDocument;
     fields: ExtractedField[];
@@ -16,7 +18,7 @@ export interface ReviewDocumentDetail {
 }
 
 export async function getDocumentForReview(id: string): Promise<ReviewDocumentDetail> {
-    const res = await fetch(`/api/documents/${id}`);
+    const res = await fetch(`${API_BASE}/api/documents/${id}`);
     if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { detail?: string };
         throw new Error(data.detail ?? `Failed to fetch document (${res.status})`);
@@ -32,11 +34,11 @@ function mapDocumentRecord(record: DocumentRecord): ReviewDocumentDetail {
     const insights = record.insights;
 
     const statusLabelMap: Record<string, string> = {
-        pending: 'Pending',
-        processing: 'Processing',
-        auto_approved: 'Auto-Approved',
+        pending: 'Needs Review',
+        processing: 'Needs Review',
+        auto_approved: 'Approved',
         manual_review: 'Needs Review',
-        requires_attention: 'Requires Attention',
+        requires_attention: 'Needs Review',
         approved: 'Approved',
         rejected: 'Rejected',
     };
@@ -84,7 +86,7 @@ function mapDocumentRecord(record: DocumentRecord): ReviewDocumentDetail {
  * The caller is responsible for calling URL.revokeObjectURL() when done.
  */
 export async function getPdfObjectUrl(documentId: string): Promise<string> {
-    const res = await fetch(`/api/documents/${documentId}/file`);
+    const res = await fetch(`${API_BASE}/api/documents/${documentId}/file`);
     if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { detail?: string };
         throw new Error(data.detail ?? `Failed to fetch PDF (${res.status})`);
@@ -97,7 +99,7 @@ export async function submitReview(
     documentId: string,
     body: ReviewRequest,
 ): Promise<ReviewResponse> {
-    const res = await fetch(`/api/documents/${documentId}/review`, {
+    const res = await fetch(`${API_BASE}/api/documents/${documentId}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

@@ -37,16 +37,12 @@ export function Dashboard() {
 
     const stats: DashboardStats = {
         totalDocuments: rawRecords.length,
-        autoApproved: rawRecords.filter(r => r.status === 'auto_approved' || r.status === 'approved').length,
-        needsReview: rawRecords.filter(r => r.status === 'manual_review' || r.status === 'requires_attention').length,
-        remedialDetected: rawRecords.filter(r =>
-            r.remedial_result?.classification === 'REMEDIAL_MINOR' ||
-            r.remedial_result?.classification === 'REMEDIAL_CRITICAL'
-        ).length,
-        criticalCount: rawRecords.filter(r => r.remedial_result?.classification === 'REMEDIAL_CRITICAL').length,
+        approved: rawRecords.filter(r => r.status === 'auto_approved' || r.status === 'approved').length,
+        needsReview: rawRecords.filter(r => r.status === 'manual_review' || r.status === 'requires_attention' || r.status === 'pending' || r.status === 'processing').length,
+        rejected: rawRecords.filter(r => r.status === 'rejected').length,
     };
 
-    const eligibleCount = documents.filter(d => d.confidence >= 85 && d.status !== 'Auto-Approved').length;
+    const eligibleCount = documents.filter(d => d.confidence >= 85 && d.status !== 'Approved').length;
 
     const handleBatchApprove = async () => {
         setBatchLoading(true);
