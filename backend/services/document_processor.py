@@ -83,7 +83,8 @@ def process_document(
 
         # ── Step 2b: PDF Text Extraction (prebuilt CU → PyMuPDF → Claude Vision) ──
         logger.info("[%s] Step 2b: Extracting text from PDF", document_id)
-        document_text = extract_text_from_pdf(pdf_bytes)
+        document_text, text_extraction_method = extract_text_from_pdf(pdf_bytes)
+        logger.info("[%s] Text extraction method: %s", document_id, text_extraction_method)
 
         # Persist text to blob so the Q&A endpoint can retrieve it later
         save_document_text(document_id, document_text)
@@ -103,6 +104,10 @@ def process_document(
         record.validation_result = validation_result
         record.remedial_result = remedial_result
         record.agent_state = agent_state
+        # Record which extraction level was used for field extraction
+        record.extraction_method = (
+            "CU Custom Analyzer" if cu_extracted_fields else text_extraction_method
+        )
         save_document(record)
 
         # ── Step 4: Confidence Scoring + Routing ─────────────────────────────

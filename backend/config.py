@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     azure_storage_connection_string: str = ""
     azure_blob_container_name: str = "mypapercompliance"
     azure_table_name: str = "MyPaperCompliance"
+    azure_audit_table_name: str = "MyPaperComplianceAudit"
 
     # ── Processing settings ──────────────────────────────────────────────────
     confidence_auto_approve_threshold: float = 85.0

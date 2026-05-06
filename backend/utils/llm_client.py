@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from functools import lru_cache
 from types import SimpleNamespace
 
@@ -183,8 +184,36 @@ class _ChatCompletions:
         temp = kwargs.get("temperature", 1.0)
         call_kwargs["temperature"] = max(0.0, min(1.0, float(temp)))
 
-        response = self._client.messages.create(**call_kwargs)
-        return _wrap_response(response)
+        # ── Retry on 529 Overloaded with exponential backoff ─────────────
+        max_retries = 4
+        base_delay = 5.0   # seconds
+        last_exc: Exception | None = None
+
+        for attempt in range(max_retries):
+            try:
+                response = self._client.messages.create(**call_kwargs)
+                return _wrap_response(response)
+            except Exception as exc:
+                # Detect overloaded (529) or rate-limit (429) responses
+                is_retryable = False
+                exc_str = str(exc)
+                if "529" in exc_str or "overloaded" in exc_str.lower():
+                    is_retryable = True
+                elif "429" in exc_str or "rate" in exc_str.lower():
+                    is_retryable = True
+
+                if is_retryable and attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)   # 5s, 10s, 20s
+                    logger.warning(
+                        "Claude API overloaded (attempt %d/%d) – retrying in %.0fs: %s",
+                        attempt + 1, max_retries, delay, exc,
+                    )
+                    time.sleep(delay)
+                    last_exc = exc
+                else:
+                    raise
+
+        raise last_exc  # unreachable but satisfies type checkers
 
 
 class _ChatResource:

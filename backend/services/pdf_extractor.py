@@ -80,9 +80,9 @@ def _extract_text_with_vision(base64_images: list[str]) -> str:
     return response.choices[0].message.content or ""
 
 
-def extract_text_from_pdf(pdf_bytes: bytes) -> str:
+def extract_text_from_pdf(pdf_bytes: bytes) -> tuple[str, str]:
     """
-    Main entry point.  Returns a single string with all document text.
+    Main entry point.  Returns (text, extraction_method).
 
     Fallback chain:
       1. Content Understanding prebuilt-documentAnalysis  (best OCR + KV pairs + tables)
@@ -98,7 +98,7 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
                 "PDF text extracted via Content Understanding prebuilt (%d chars)",
                 len(cu_text),
             )
-            return cu_text
+            return cu_text, "CU Prebuilt"
     except Exception as exc:
         logger.warning("Content Understanding prebuilt step raised: %s", exc)
 
@@ -123,7 +123,7 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
                 len(full_text),
                 len(pages_text),
             )
-            return full_text
+            return full_text, "PyMuPDF"
 
         # ── Level 3: Claude Vision for scanned pages ─────────────────────────
         logger.info("Sparse text detected — switching to Claude Vision extraction")
@@ -134,7 +134,7 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
             len(vision_text),
             len(images),
         )
-        return vision_text
+        return vision_text, "Claude Vision"
 
     except Exception as exc:
         logger.exception("PDF extraction failed: %s", exc)
