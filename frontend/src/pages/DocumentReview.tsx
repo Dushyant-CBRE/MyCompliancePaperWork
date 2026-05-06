@@ -1,80 +1,82 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Loader2, AlertCircle } from 'lucide-react';
-import type { DocumentRecord } from '../types/document-types';
+import type { ExtractedField, ValidationCheck, RemedialEvidence, ReviewDocument } from '../types/review-types';
 import { DocumentReviewHeader } from '../components/documentreview/DocumentReviewHeader';
 import { PDFViewerPanel } from '../components/documentreview/PDFViewerPanel';
 import { AnalysisPanel } from '../components/documentreview/AnalysisPanel';
 import { OverrideModal } from '../components/documentreview/OverrideModal';
-import { getDocumentById, overrideDocument, mapDocumentToReview } from '../api/document-review-api';
+import { ReviewModal } from '../components/documentreview/ReviewModal';
+import { getDocumentForReview, getPdfObjectUrl, submitReview } from '../api/review-api';
 
 type TabId = 'fields' | 'validation' | 'remedial' | 'audit';
 
 export function DocumentReview() {
     const { id } = useParams();
-    const [record, setRecord] = useState<DocumentRecord | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<TabId>('fields');
     const [showOverrideModal, setShowOverrideModal] = useState(false);
-    const [overrideLoading, setOverrideLoading] = useState(false);
+    const [showReviewModal, setShowReviewModal] = useState(false);
 
-    const fetchDocument = useCallback(async () => {
-        if (!id) return;
-        try {
-            const data = await getDocumentById(id);
-            setRecord(data);
-            setError(null);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to fetch document');
-        } finally {
-            setLoading(false);
-        }
-    }, [id]);
+    const [doc, setDoc] = useState<ReviewDocument | null>(null);
+    const [fields, setFields] = useState<ExtractedField[]>([]);
+    const [checks, setChecks] = useState<ValidationCheck[]>([]);
+    const [evidence, setEvidence] = useState<RemedialEvidence[]>([]);
+    const [pdfObjectUrl, setPdfObjectUrl] = useState<string | null>(null);
+    const [pdfLoading, setPdfLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchDocument();
-    }, [fetchDocument]);
-
-    const handleOverride = async (decision: 'approved' | 'rejected', reason: string) => {
         if (!id) return;
-        setOverrideLoading(true);
-        try {
-            const updated = await overrideDocument(id, {
-                decision,
-                reason,
-                officer_name: 'Compliance Officer',
-            });
-            setRecord(updated);
-            setShowOverrideModal(false);
-        } catch (err) {
-            alert(err instanceof Error ? err.message : 'Override failed');
-        } finally {
-            setOverrideLoading(false);
-        }
-    };
+        setLoading(true);
+        setError(null);
+        getDocumentForReview(id)
+            .then(({ doc, fields, checks, evidence }) => {
+                setDoc(doc);
+                setFields(fields);
+                setChecks(checks);
+                setEvidence(evidence);
+            })
+            .catch((err: unknown) => {
+                setError(err instanceof Error ? err.message : 'Failed to load document.');
+            })
+            .finally(() => setLoading(false));
+    }, [id]);
+
+    // Fetch PDF bytes via backend proxy (keeps Azure credentials server-side)
+    useEffect(() => {
+        if (!id) return;
+        let objectUrl: string | null = null;
+        setPdfLoading(true);
+        getPdfObjectUrl(id)
+            .then((url) => {
+                objectUrl = url;
+                setPdfObjectUrl(url);
+            })
+            .catch(() => {
+                // Non-fatal: viewer shows placeholder if PDF unavailable
+                setPdfObjectUrl(null);
+            })
+            .finally(() => setPdfLoading(false));
+        return () => {
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+        };
+    }, [id]);
 
     if (loading) {
         return (
-            <div className="h-full flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                Loading document…
             </div>
         );
     }
 
-    if (error || !record) {
+    if (error || !doc) {
         return (
-            <div className="h-full flex items-center justify-center">
-                <div className="text-center">
-                    <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-                    <p className="text-lg font-medium">Failed to load document</p>
-                    <p className="text-muted-foreground mt-1">{error || 'Document not found'}</p>
-                </div>
+            <div className="h-full flex items-center justify-center text-destructive text-sm">
+                {error ?? 'Document not found.'}
             </div>
         );
     }
-
-    const { doc, fields, checks, evidence, auditData, pdfUrl } = mapDocumentToReview(record);
 
     return (
         <div className="h-full flex flex-col">
@@ -82,25 +84,33 @@ export function DocumentReview() {
                 doc={doc}
                 id={id}
                 onOverride={() => setShowOverrideModal(true)}
+                onReview={() => setShowReviewModal(true)}
             />
 
             <div className="flex-1 flex overflow-hidden">
-                <PDFViewerPanel fileName={doc.name} pdfUrl={pdfUrl} />
+                <PDFViewerPanel fileName={doc.name} blobUrl={pdfObjectUrl} pdfLoading={pdfLoading} />
                 <AnalysisPanel
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
                     fields={fields}
                     checks={checks}
-                    evidence={evidence}
-                    auditData={auditData}
+                    evidence={evidence} 
+                    auditData={undefined}                
                 />
             </div>
 
             {showOverrideModal && (
-                <OverrideModal
-                    onClose={() => setShowOverrideModal(false)}
-                    onSubmit={handleOverride}
-                    isLoading={overrideLoading}
+                <OverrideModal onClose={() => setShowOverrideModal(false)} 
+                onSubmit={() => {}}/>
+            )}
+
+            {showReviewModal && (
+                <ReviewModal
+                    documentId={id ?? ''}
+                    onClose={() => setShowReviewModal(false)}
+                    onSubmit={async (status, justification) => {
+                        await submitReview(id ?? '', { status, justification });
+                    }}
                 />
             )}
         </div>

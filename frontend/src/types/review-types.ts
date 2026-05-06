@@ -27,13 +27,15 @@ export interface ReviewDocument {
     slaRemaining: string;
 }
 
-export interface AuditData {
-    modelDecision: string;
-    processingTime: string;
-    timestamp: string;
-    extractionScore: number;
-    validationScore: number;
-    remedialScore: number;
-    iterations?: number;
-    toolsCalled?: string[];
+export interface ReviewRequest {
+    status: 'Approved' | 'Rejected';
+    justification: string;
+}
+
+export interface ReviewResponse {
+    id: string;
+    status: 'Approved' | 'Rejected';
+    justification: string;
+    reviewedAt: string;
+    reviewedBy?: string;
 }

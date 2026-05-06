@@ -130,6 +130,21 @@ def get_pdf_from_blob(document_id: str, filename: str) -> Optional[bytes]:
         return None
 
 
+def get_pdf_from_blob_url(blob_url: str) -> Optional[bytes]:
+    """Download a PDF directly using its full Azure Blob Storage URL."""
+    try:
+        from azure.storage.blob import BlobClient  # type: ignore
+        blob_client = BlobClient.from_blob_url(blob_url)
+        stream = blob_client.download_blob()
+        return stream.readall()
+    except ImportError:
+        logger.warning("azure-storage-blob not installed – cannot fetch by URL")
+        return None
+    except Exception as exc:
+        logger.error("Blob download by URL failed for %s: %s", blob_url, exc)
+        return None
+
+
 def save_document_text(document_id: str, text: str) -> None:
     """Store the extracted plain text of a document as {document_id}/document_text.txt."""
     settings = get_settings()

@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, Clock } from 'lucide-react';
+import { ArrowLeft, FileText, Clock, ClipboardCheck, SlidersHorizontal } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { ReviewDocument } from '../../types/review-types';
 
@@ -6,9 +6,10 @@ interface DocumentReviewHeaderProps {
     doc: ReviewDocument;
     id: string | undefined;
     onOverride: () => void;
+    onReview: () => void;
 }
 
-export function DocumentReviewHeader({ doc, id, onOverride }: DocumentReviewHeaderProps) {
+export function DocumentReviewHeader({ doc, id, onOverride, onReview }: DocumentReviewHeaderProps) {
     const navigate = useNavigate();
 
     return (
@@ -54,17 +55,19 @@ export function DocumentReviewHeader({ doc, id, onOverride }: DocumentReviewHead
             </div>
 
             <div className="flex items-center gap-3">
-                <button className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm">
-                    Approve
+                <button
+                    onClick={onReview}
+                    className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium shadow-sm"
+                >
+                    <ClipboardCheck className="w-4 h-4" />
+                    Review
                 </button>
                 <button
                     onClick={onOverride}
-                    className="px-6 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-sm"
+                    className="flex items-center gap-2 px-5 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-sm font-medium shadow-sm"
                 >
+                    <SlidersHorizontal className="w-4 h-4" />
                     Override
-                </button>
-                <button className="px-6 py-2 bg-destructive text-primary-foreground rounded-lg hover:bg-destructive/90 transition-colors text-sm">
-                    Reject
                 </button>
                 <div className="flex-1" />
                 <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg">

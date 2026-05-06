@@ -215,6 +215,20 @@ class OverrideRequest(BaseModel):
     officer_name: str
 
 
+class ReviewRequest(BaseModel):
+    """Payload for an officer review submission."""
+    status: str                        # "Approved" or "Rejected"
+    justification: str
+
+
+class ReviewResponse(BaseModel):
+    """Response returned after a review is submitted."""
+    document_id: str
+    status: DocumentStatus
+    justification: str
+    reviewed_at: datetime
+
+
 class UploadResponse(BaseModel):
     document_id: str
     filename: str
