@@ -7,12 +7,10 @@ import type {
     AuditData,
 } from '../types/review-types';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
 // ── API functions ────────────────────────────────────────────────────────────
 
 export async function getDocumentById(id: string): Promise<DocumentRecord> {
-    const res = await fetch(`${BASE_URL}/api/documents/${id}`);
+    const res = await fetch(`/api/documents/${id}`);
     if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `Failed to fetch document (${res.status})`);
@@ -21,7 +19,7 @@ export async function getDocumentById(id: string): Promise<DocumentRecord> {
 }
 
 export async function overrideDocument(id: string, body: OverrideRequest): Promise<DocumentRecord> {
-    const res = await fetch(`${BASE_URL}/api/documents/${id}/override`, {
+    const res = await fetch(`/api/documents/${id}/override`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -34,7 +32,7 @@ export async function overrideDocument(id: string, body: OverrideRequest): Promi
 }
 
 export function getDocumentPdfUrl(id: string): string {
-    return `${BASE_URL}/api/documents/${id}/pdf`;
+    return `/api/documents/${id}/pdf`;
 }
 
 // ── Mapping helpers ──────────────────────────────────────────────────────────
