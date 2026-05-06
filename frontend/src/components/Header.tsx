@@ -1,8 +1,26 @@
-import { Bell, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Bell, ChevronDown } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export function Header() {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const isDocumentReview = location.pathname.startsWith('/document/');
+
     return (
-        <header className="bg-card border-b border-border px-6 py-3 flex items-center justify-end shrink-0">
+        <header className="bg-card border-b border-border px-6 py-3 flex items-center justify-between shrink-0">
+
+            <div className="flex items-center gap-2">
+                {isDocumentReview && (
+                    <button
+                        onClick={() => navigate('/')}
+                        className="flex items-center gap-1.5 p-2 hover:bg-muted rounded-lg transition-colors text-sm font-medium"
+                        title="Back to dashboard"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                        Back
+                    </button>
+                )}
+            </div>
 
             <div className="flex items-center gap-3">
                 <button className="relative p-2 hover:bg-muted rounded-lg transition-colors">

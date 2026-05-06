@@ -99,7 +99,7 @@ export function AskAIPanel({ documentId, isOpen, onClose }: AskAIPanelProps) {
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
                 <div className="flex items-center gap-2">
-                    <MessageCircle className="w-5 h-5 text-accent" />
+                    <img src="/EllisIcon.png" alt="" className="w-6 h-6" />
                     <h3 className="font-medium">Ask AI</h3>
                 </div>
                 <button

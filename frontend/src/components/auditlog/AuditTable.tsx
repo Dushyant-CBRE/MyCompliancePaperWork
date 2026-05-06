@@ -39,7 +39,6 @@ export function AuditTable({ entries }: AuditTableProps) {
                         <th className="px-6 py-3 text-left text-sm font-medium">Action</th>
                         <th className="px-6 py-3 text-left text-sm font-medium">Document</th>
                         <th className="px-6 py-3 text-left text-sm font-medium">Details</th>
-                        <th className="px-6 py-3 text-left text-sm font-medium">Training</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -80,13 +79,6 @@ export function AuditTable({ entries }: AuditTableProps) {
                                             </p>
                                         )}
                                     </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    {entry.trainingFeedback && (
-                                        <span className="inline-flex px-2 py-1 bg-blue-50 text-blue-800 rounded text-xs">
-                                            Training
-                                        </span>
-                                    )}
                                 </td>
                             </tr>
                         );
