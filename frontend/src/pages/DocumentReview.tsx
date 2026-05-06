@@ -5,6 +5,7 @@ import { DocumentReviewHeader } from '../components/documentreview/DocumentRevie
 import { PDFViewerPanel } from '../components/documentreview/PDFViewerPanel';
 import { AnalysisPanel } from '../components/documentreview/AnalysisPanel';
 import { OverrideModal } from '../components/documentreview/OverrideModal';
+import { AskAIPanel } from '../components/documentreview/AskAIPanel';
 import { getDocumentForReview, getPdfObjectUrl } from '../api/review-api';
 import { getDocuments } from '../api/dashboard-api';
 
@@ -17,6 +18,7 @@ export function DocumentReview() {
 
     const [activeTab, setActiveTab] = useState<TabId>('fields');
     const [showOverrideModal, setShowOverrideModal] = useState(false);
+    const [showAskAI, setShowAskAI] = useState(false);
 
     // ID list for prev/next — comes from router state or is fetched as fallback
     const [ids, setIds] = useState<string[]>((location.state as { ids?: string[] } | null)?.ids ?? []);
@@ -110,6 +112,7 @@ export function DocumentReview() {
                 doc={doc}
                 id={id}
                 onOverride={() => setShowOverrideModal(true)}
+                onAskAI={() => setShowAskAI(true)}
                 onStatusChange={(newStatus) => setDoc((prev) => prev ? { ...prev, status: newStatus } : prev)}
                 hasPrev={hasPrev}
                 hasNext={hasNext}
@@ -134,6 +137,14 @@ export function DocumentReview() {
             {showOverrideModal && (
                 <OverrideModal onClose={() => setShowOverrideModal(false)} 
                 onSubmit={() => {}}/>
+            )}
+
+            {id && (
+                <AskAIPanel
+                    documentId={id}
+                    isOpen={showAskAI}
+                    onClose={() => setShowAskAI(false)}
+                />
             )}
         </div>
     );

@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, FileText, Clock, ThumbsUp, ThumbsDown, SlidersHorizontal, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Clock, ThumbsUp, ThumbsDown, SlidersHorizontal, MessageCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ReviewDocument } from '../../types/review-types';
@@ -22,6 +22,7 @@ interface DocumentReviewHeaderProps {
     doc: ReviewDocument;
     id: string | undefined;
     onOverride: () => void;
+    onAskAI: () => void;
     onStatusChange?: (newStatus: string) => void;
     onPrev?: () => void;
     onNext?: () => void;
@@ -31,7 +32,7 @@ interface DocumentReviewHeaderProps {
     totalCount?: number;
 }
 
-export function DocumentReviewHeader({ doc, id, onOverride, onStatusChange, onPrev, onNext, hasPrev, hasNext }: DocumentReviewHeaderProps) {
+export function DocumentReviewHeader({ doc, id, onOverride, onAskAI, onStatusChange, onPrev, onNext, hasPrev, hasNext }: DocumentReviewHeaderProps) {
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState<'Approved' | 'Rejected' | null>(null);
 
@@ -124,6 +125,13 @@ export function DocumentReviewHeader({ doc, id, onOverride, onStatusChange, onPr
                     >
                         <SlidersHorizontal className="w-4 h-4" />
                         Override
+                    </button>
+                    <button
+                        onClick={onAskAI}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
+                    >
+                        <MessageCircle className="w-4 h-4" />
+                        Ask AI
                     </button>
                 </div>
             </div>
