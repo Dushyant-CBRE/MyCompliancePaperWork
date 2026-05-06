@@ -61,10 +61,11 @@ def _extract_text_with_vision(base64_images: list[str]) -> str:
     ]
     for img_b64 in base64_images:
         content.append({
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:image/png;base64,{img_b64}",
-                "detail": "high",
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/png",
+                "data": img_b64,
             },
         })
 

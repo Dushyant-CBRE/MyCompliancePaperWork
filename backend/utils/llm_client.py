@@ -135,7 +135,36 @@ class _ChatCompletions:
                 })
 
             else:
-                anthropic_msgs.append({"role": role, "content": m["content"]})
+                # Convert content: if it's a list, translate OpenAI image_url
+                # blocks to Anthropic's native image format.
+                raw_content = m["content"]
+                if isinstance(raw_content, list):
+                    converted: list[dict] = []
+                    for block in raw_content:
+                        if block.get("type") == "image_url":
+                            url: str = block["image_url"]["url"]
+                            if url.startswith("data:"):
+                                # data:image/png;base64,<data>
+                                header, data = url.split(",", 1)
+                                media_type = header.split(":")[1].split(";")[0]
+                                converted.append({
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": media_type,
+                                        "data": data,
+                                    },
+                                })
+                            else:
+                                converted.append({
+                                    "type": "image",
+                                    "source": {"type": "url", "url": url},
+                                })
+                        else:
+                            converted.append(block)
+                    anthropic_msgs.append({"role": role, "content": converted})
+                else:
+                    anthropic_msgs.append({"role": role, "content": raw_content})
 
         # ── Build call kwargs ─────────────────────────────────────────────
         call_kwargs: dict = {

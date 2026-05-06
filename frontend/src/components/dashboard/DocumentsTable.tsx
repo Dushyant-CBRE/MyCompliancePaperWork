@@ -12,6 +12,7 @@ interface DocumentsTableProps {
 
 export function DocumentsTable({ documents, onApproveAll, onRefresh }: DocumentsTableProps) {
     const navigate = useNavigate();
+    const ids = documents.map((d) => d.id);
     return (
         <div className="bg-card border border-border rounded-lg">
             {/* Toolbar */}
@@ -81,7 +82,7 @@ export function DocumentsTable({ documents, onApproveAll, onRefresh }: Documents
                         {documents.map((doc) => (
                             <tr
                                 key={doc.id}
-                                onClick={() => navigate(`/document/${doc.id}`)}
+                                onClick={() => navigate(`/document/${doc.id}`, { state: { ids } })}
                                 className="hover:bg-muted/30 transition-colors cursor-pointer"
                             >
                                 <td className="px-6 py-4 text-sm font-medium">
