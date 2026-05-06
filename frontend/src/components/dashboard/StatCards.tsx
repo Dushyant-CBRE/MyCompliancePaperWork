@@ -9,9 +9,9 @@ export function StatCards({ stats }: StatCardsProps) {
     const total = stats.totalDocuments || 1; // avoid division by zero
     const statItems = [
         { label: 'Total Documents', value: String(stats.totalDocuments), change: '+0 today' },
-        { label: 'Auto-Approved', value: String(stats.autoApproved), change: `${Math.round(stats.autoApproved / total * 100)}% rate` },
+        { label: 'Approved', value: String(stats.approved), change: `${Math.round(stats.approved / total * 100)}% rate` },
         { label: 'Needs Review', value: String(stats.needsReview), change: `${Math.round(stats.needsReview / total * 100)}% rate` },
-        { label: 'Remedial Detected', value: String(stats.remedialDetected), change: `Critical: ${stats.criticalCount}` },
+        { label: 'Rejected', value: String(stats.rejected), change: `${Math.round(stats.rejected / total * 100)}% rate` },
     ];
 
     return (

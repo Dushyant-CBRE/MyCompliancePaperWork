@@ -28,9 +28,9 @@ export function Analytics() {
             );
     }, []);
 
-    const overrideRate =
+    const rejectedRate =
         summary && summary.total_documents > 0
-            ? Math.max(0, (summary.approved / summary.total_documents) * 100)
+            ? Math.max(0, (summary.rejected / summary.total_documents) * 100)
             : 0;
 
     return (
@@ -45,9 +45,9 @@ export function Analytics() {
                 </div>
             )}
             <AnalyticsStatCards
-                autoApproveRate={summary?.auto_approval_rate ?? 0}
-                criticalAlerts={summary?.remedial_critical ?? 0}
-                overrideRate={overrideRate}
+                approveRate={summary?.auto_approval_rate ?? 0}
+                needsReviewCount={summary?.manual_review ?? 0}
+                rejectedRate={rejectedRate}
                 avgProcessingTime={formatProcessingTime(summary?.avg_processing_time_seconds ?? 0)}
             />
             <div className="grid grid-cols-2 gap-6 mb-6">
@@ -58,7 +58,7 @@ export function Analytics() {
                 <SiteBreakdownTable data={summary?.site_breakdown ?? []} />
             </div>
             <div className="grid grid-cols-2 gap-6">
-                <QualitySafetyCard criticalRemedial={summary?.remedial_critical ?? 0} />
+                <QualitySafetyCard needsReviewCount={summary?.manual_review ?? 0} />
                 <PPMDistributionCard data={summary?.ppm_distribution ?? []} />
             </div>
         </div>

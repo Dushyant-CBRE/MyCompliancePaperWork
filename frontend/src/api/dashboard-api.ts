@@ -6,11 +6,13 @@
     DocStatus,
 } from '../types/document-types';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
 export async function getDocuments(status?: string, limit = 50): Promise<DocumentListResponse> {
     const params = new URLSearchParams({ limit: String(limit) });
     if (status) params.append('status', status);
 
-    const res = await fetch(`/api/documents?${params}`);
+    const res = await fetch(`${API_BASE}/api/documents?${params}`);
     if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `Failed to fetch documents (${res.status})`);
@@ -19,7 +21,7 @@ export async function getDocuments(status?: string, limit = 50): Promise<Documen
 }
 
 export async function overrideDocument(id: string, body: OverrideRequest): Promise<DocumentRecord> {
-    const res = await fetch(`/api/documents/${id}/override`, {
+    const res = await fetch(`${API_BASE}/api/documents/${id}/override`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -38,14 +40,7 @@ export function mapDocumentRecord(record: DocumentRecord): Document {
 
     // Status mapping
     let status: DocStatus = 'Needs Review';
-    if (
-        rem?.classification === 'REMEDIAL_MINOR' ||
-        rem?.classification === 'REMEDIAL_CRITICAL'
-    ) {
-        status = 'Remedial Detected';
-    } else if (record.status === 'auto_approved') {
-        status = 'Auto-Approved';
-    } else if (record.status === 'approved') {
+    if (record.status === 'auto_approved' || record.status === 'approved') {
         status = 'Approved';
     } else if (record.status === 'rejected') {
         status = 'Rejected';

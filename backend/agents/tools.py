@@ -8,6 +8,8 @@ individual tool calls don't need to re-pass large blobs of text.
 """
 from __future__ import annotations
 
+import re
+
 import json
 import logging
 from dataclasses import dataclass, field
@@ -203,11 +205,12 @@ def tool_re_extract_field(ctx: OrchestratorContext, args: dict) -> str:
         response = client.chat.completions.create(
             model=settings.azure_openai_deployment_primary,
             messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
             temperature=0.0,
         )
         raw = response.choices[0].message.content or "{}"
-        data = json.loads(raw)
+        raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
+        raw = re.sub(r"\s*```$", "", raw).strip()
+        data = json.loads(raw or "{}")
         new_value = data.get("value")
         new_confidence = float(data.get("confidence", 0))
 

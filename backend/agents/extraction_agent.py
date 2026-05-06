@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from backend.config import get_settings
 from backend.models.document import ExtractedFields
@@ -89,6 +90,14 @@ Rules:
 """
 
 
+def _parse_json(raw: str) -> dict:
+    """Strip markdown fences Claude may add around JSON responses."""
+    raw = (raw or "").strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+    return json.loads(raw.strip() or "{}")
+
+
 def run_extraction_agent(document_text: str) -> ExtractedFields:
     """
     Run Agent 1 against the provided document text.
@@ -111,12 +120,11 @@ def run_extraction_agent(document_text: str) -> ExtractedFields:
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": user_content},
             ],
-            response_format={"type": "json_object"},
             temperature=0.0,
         )
 
         raw_json = response.choices[0].message.content or "{}"
-        data = json.loads(raw_json)
+        data = _parse_json(raw_json)
         result = ExtractedFields(
             **{k: v for k, v in data.items() if k in ExtractedFields.model_fields},
             raw_text_length=len(document_text),

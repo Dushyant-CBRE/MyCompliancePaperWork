@@ -17,12 +17,22 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from backend.config import get_settings
 from backend.models.document import RemedialClassification, RemedialResult
 from backend.utils.llm_client import get_llm_client
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_json(raw: str) -> dict:
+    """Extract JSON from a Claude response that may wrap it in markdown code fences."""
+    raw = (raw or "").strip()
+    # Strip ```json ... ``` or ``` ... ``` fences
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+    return json.loads(raw.strip() or "{}")
 
 # If the primary classification confidence is below this, escalate to the fallback model
 _ESCALATION_THRESHOLD = 75.0
@@ -85,11 +95,10 @@ def _call_llm(model_deployment: str, document_text: str) -> dict:
             {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
-        response_format={"type": "json_object"},
         temperature=0.0,
     )
     raw_json = response.choices[0].message.content or "{}"
-    return json.loads(raw_json)
+    return _parse_json(raw_json)
 
 
 def run_remedial_detection_agent(document_text: str) -> RemedialResult:

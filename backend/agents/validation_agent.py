@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from datetime import date
 
@@ -104,12 +105,13 @@ def run_validation_agent(
                 {"role": "system", "content": _build_system_prompt()},
                 {"role": "user", "content": user_content},
             ],
-            response_format={"type": "json_object"},
-            temperature=0.0,
+        temperature=0.0,
         )
 
         raw_json = response.choices[0].message.content or "{}"
-        data = json.loads(raw_json)
+        raw_json = re.sub(r"^```(?:json)?\s*", "", raw_json.strip())
+        raw_json = re.sub(r"\s*```$", "", raw_json).strip()
+        data = json.loads(raw_json or "{}")
         result = ValidationResult(
             **{k: v for k, v in data.items() if k in ValidationResult.model_fields}
         )

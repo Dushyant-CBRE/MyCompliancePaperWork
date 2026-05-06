@@ -19,24 +19,24 @@ export function SiteBreakdownTable({ data }: SiteBreakdownTableProps) {
                         <tr>
                             <th className="px-6 py-3 text-left text-sm font-medium">Site</th>
                             <th className="px-6 py-3 text-left text-sm font-medium">
-                                Auto-Approved
+                                Approved
                             </th>
                             <th className="px-6 py-3 text-left text-sm font-medium">
                                 Needs Review
                             </th>
                             <th className="px-6 py-3 text-left text-sm font-medium">
-                                Remedial Detected
+                                Rejected
                             </th>
                             <th className="px-6 py-3 text-left text-sm font-medium">Total</th>
                             <th className="px-6 py-3 text-left text-sm font-medium">
-                                Auto-Approve %
+                                Approve %
                             </th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                         {data.map((site) => {
                             const total = site.approved + site.review + site.remedial;
-                            const autoApprovePercent = Math.round((site.approved / total) * 100);
+                            const approvePercent = Math.round((site.approved / total) * 100);
                             return (
                                 <tr key={site.site} className="hover:bg-muted/30">
                                     <td className="px-6 py-4 text-sm">{site.site}</td>
@@ -59,10 +59,10 @@ export function SiteBreakdownTable({ data }: SiteBreakdownTableProps) {
                                             <div className="flex-1 bg-muted rounded-full h-2 max-w-[100px]">
                                                 <div
                                                     className="h-full rounded-full bg-accent"
-                                                    style={{ width: `${autoApprovePercent}%` }}
+                                                    style={{ width: `${approvePercent}%` }}
                                                 />
                                             </div>
-                                            <span className="text-sm">{autoApprovePercent}%</span>
+                                            <span className="text-sm">{approvePercent}%</span>
                                         </div>
                                     </td>
                                 </tr>
