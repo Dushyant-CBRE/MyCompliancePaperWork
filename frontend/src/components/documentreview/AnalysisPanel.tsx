@@ -12,7 +12,7 @@ interface AnalysisPanelProps {
     fields: ExtractedField[];
     checks: ValidationCheck[];
     evidence: RemedialEvidence[];
-    auditData: AuditData;
+    auditData?: AuditData;
 }
 
 const tabs: { id: TabId; label: string }[] = [
@@ -54,7 +54,7 @@ export function AnalysisPanel({
                 {activeTab === 'fields' && <ExtractedFieldsTab fields={fields} />}
                 {activeTab === 'validation' && <ValidationChecksTab checks={checks} />}
                 {activeTab === 'remedial' && <RemedialDetectionTab evidence={evidence} />}
-                {activeTab === 'audit' && <AuditReasoningTab data={auditData} />}
+                {activeTab === 'audit' && auditData && <AuditReasoningTab data={auditData} />}
             </div>
         </div>
     );

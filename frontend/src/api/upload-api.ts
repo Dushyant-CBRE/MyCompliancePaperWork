@@ -1,5 +1,7 @@
 import type { UploadMetadata, UploadResponse } from "../types/document-types";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
 export async function uploadDocument(
     file: File,
     metadata: UploadMetadata = {},
@@ -14,7 +16,7 @@ export async function uploadDocument(
     if (metadata.expected_vendor_name) form.append('expected_vendor_name', metadata.expected_vendor_name);
     if (metadata.notes) form.append('notes', metadata.notes);
 
-    const res = await fetch(`/api/upload`, {
+    const res = await fetch(`${API_BASE}/api/upload`, {
         method: 'POST',
         body: form,
     });

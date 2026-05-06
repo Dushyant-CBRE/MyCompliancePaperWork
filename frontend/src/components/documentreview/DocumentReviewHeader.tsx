@@ -8,8 +8,8 @@ function StatusBadge({ status }: { status: string }) {
     const s = status.toLowerCase();
     let cls = 'bg-yellow-50 text-yellow-700 border-yellow-200';
     let Icon = Clock;
-    if (s === 'approved' || s === 'auto-approved') { cls = 'bg-green-50 text-green-700 border-green-200'; Icon = CheckCircle2; }
-    else if (s === 'rejected' || s === 'requires attention') { cls = 'bg-red-50 text-red-700 border-red-200'; Icon = AlertTriangle; }
+    if (s === 'approved') { cls = 'bg-green-50 text-green-700 border-green-200'; Icon = CheckCircle2; }
+    else if (s === 'rejected') { cls = 'bg-red-50 text-red-700 border-red-200'; Icon = AlertTriangle; }
     return (
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium ${cls}`}>
             <Icon className="w-3 h-3" />
