@@ -4,6 +4,7 @@ import { Upload } from 'lucide-react';
 import type { Document, DocumentRecord, DashboardStats } from '../types/document-types';
 import { PageHeader } from '../components/PageHeader';
 import { StatCards } from '../components/dashboard/StatCards';
+import type { FilterKey } from '../components/dashboard/StatCards';
 import { ProcessingPipeline } from '../components/dashboard/ProcessingPipeline';
 import { DocumentsTable } from '../components/dashboard/DocumentsTable';
 import { BatchApproveModal } from '../components/dashboard/BatchApproveModal';
@@ -18,6 +19,19 @@ export function Dashboard() {
     const [showBatchModal, setShowBatchModal] = useState(false);
     const [batchLoading, setBatchLoading] = useState(false);
     const [hoveredStatus, setHoveredStatus] = useState<string | null>(null);
+    const [activeFilters, setActiveFilters] = useState<FilterKey[]>([]);
+
+    const filteredDocuments = activeFilters.length > 0
+        ? documents.filter(d => {
+            const s = d.status.toLowerCase();
+            return activeFilters.some(f => {
+                if (f === 'Approved') return s === 'approved' || s === 'auto-approved' || s === 'auto_approved';
+                if (f === 'Needs Review') return s === 'needs review' || s === 'manual_review' || s === 'remedial detected' || s === 'requires_attention';
+                if (f === 'Rejected') return s === 'rejected';
+                return false;
+            });
+          })
+        : documents;
 
     const fetchDocuments = useCallback(async () => {
         try {
@@ -86,7 +100,7 @@ export function Dashboard() {
                     Upload / Import
                 </button>
             </div>
-            <StatCards stats={stats} />
+            <StatCards stats={stats} activeFilters={activeFilters} onFilterChange={setActiveFilters} />
             <ProcessingPipeline status={hoveredStatus ?? undefined} />
             {error && (
                 <div className="mb-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
@@ -99,7 +113,7 @@ export function Dashboard() {
                 </div>
             ) : (
                 <DocumentsTable
-                    documents={documents}
+                    documents={filteredDocuments}
                     onApproveAll={() => setShowBatchModal(true)}
                     onRefresh={fetchDocuments}
                     onHoverStatus={setHoveredStatus}
