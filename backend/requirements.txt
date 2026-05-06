@@ -18,6 +18,10 @@ PyMuPDF>=1.25.0              # fitz – fast embedded-text extraction + page-to-
 azure-storage-blob>=12.20.0
 azure-data-tables>=12.5.0
 
+# ── Azure AI (Content Understanding + Identity) ───────────────────────────────
+azure-ai-contentunderstanding>=1.0.0
+azure-identity>=1.17.0
+
 # ── Dev / testing ─────────────────────────────────────────────────────────────
 pytest>=9.0.3
 pytest-asyncio>=0.23.0

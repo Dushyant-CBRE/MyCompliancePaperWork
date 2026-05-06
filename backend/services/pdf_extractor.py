@@ -83,11 +83,25 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     """
     Main entry point.  Returns a single string with all document text.
 
-    Flow:
-      - Try embedded text extraction via PyMuPDF.
-      - If any page is too sparse (scanned), fall back to GPT-4o Vision for
-        the entire document so context isn't lost across pages.
+    Fallback chain:
+      1. Content Understanding prebuilt-documentAnalysis  (best OCR + KV pairs + tables)
+      2. PyMuPDF embedded text extraction                 (fast, works on digital PDFs)
+      3. Claude Vision                                    (last resort for scanned pages)
     """
+    # ── Level 1: Content Understanding prebuilt ──────────────────────────────
+    try:
+        from backend.services.content_understanding import extract_text_with_prebuilt
+        cu_text = extract_text_with_prebuilt(pdf_bytes)
+        if cu_text and len(cu_text) > MIN_TEXT_CHARS_PER_PAGE:
+            logger.info(
+                "PDF text extracted via Content Understanding prebuilt (%d chars)",
+                len(cu_text),
+            )
+            return cu_text
+    except Exception as exc:
+        logger.warning("Content Understanding prebuilt step raised: %s", exc)
+
+    # ── Level 2: PyMuPDF embedded text ────────────────────────────────────────
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         pages_text: list[str] = []
@@ -110,12 +124,12 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
             )
             return full_text
 
-        # Scanned document: use GPT-4o Vision
-        logger.info("Sparse text detected — switching to GPT-4o Vision extraction")
+        # ── Level 3: Claude Vision for scanned pages ─────────────────────────
+        logger.info("Sparse text detected — switching to Claude Vision extraction")
         images = _pdf_bytes_to_base64_images(pdf_bytes)
         vision_text = _extract_text_with_vision(images)
         logger.info(
-            "GPT-4o Vision extracted %d chars from %d page images",
+            "Claude Vision extracted %d chars from %d page images",
             len(vision_text),
             len(images),
         )
