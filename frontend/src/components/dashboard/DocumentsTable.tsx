@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Filter, Download, ArrowUpDown } from 'lucide-react';
+import { Filter, Download, ArrowUpDown, RefreshCw } from 'lucide-react';
 import type { Document } from '../../types';
 import { StatusBadge } from '../StatusBadge';
 import { ConfidenceBar } from '../ConfidenceBar';
@@ -7,9 +7,10 @@ import { ConfidenceBar } from '../ConfidenceBar';
 interface DocumentsTableProps {
     documents: Document[];
     onApproveAll: () => void;
+    onRefresh: () => void;
 }
 
-export function DocumentsTable({ documents, onApproveAll }: DocumentsTableProps) {
+export function DocumentsTable({ documents, onApproveAll, onRefresh }: DocumentsTableProps) {
     const navigate = useNavigate();
     return (
         <div className="bg-card border border-border rounded-lg">
@@ -24,6 +25,13 @@ export function DocumentsTable({ documents, onApproveAll }: DocumentsTableProps)
                         <button className="px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors flex items-center gap-2 text-sm">
                             <ArrowUpDown className="w-4 h-4" />
                             Sort
+                        </button>
+                        <button
+                            onClick={onRefresh}
+                            className="px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors flex items-center gap-2 text-sm"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            Refresh
                         </button>
                     </div>
                     <div className="flex items-center gap-3">

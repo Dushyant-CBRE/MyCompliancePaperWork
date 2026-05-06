@@ -1,4 +1,4 @@
-export type DocStatus = 'Auto-Approved' | 'Needs Review' | 'Remedial Detected';
+export type DocStatus = 'Auto-Approved' | 'Approved' | 'Needs Review' | 'Remedial Detected';
 
 export interface Document {
     id: string;
@@ -72,27 +72,38 @@ export interface BackendDocumentMetadata {
 export interface BackendExtractedFields {
     site_name: string | null;
     site_name_confidence: number;
+    site_name_source: string | null;
     ppm_reference: string | null;
     ppm_reference_confidence: number;
+    ppm_reference_source: string | null;
     inspection_date: string | null;
     inspection_date_confidence: number;
+    inspection_date_source: string | null;
     inspector_name: string | null;
     inspector_name_confidence: number;
+    inspector_name_source: string | null;
     equipment_id: string | null;
     equipment_id_confidence: number;
+    equipment_id_source: string | null;
     document_type: string | null;
     document_type_confidence: number;
+    document_type_source: string | null;
     vendor_name: string | null;
     vendor_name_confidence: number;
+    vendor_name_source: string | null;
     certificate_number: string | null;
     certificate_number_confidence: number;
+    certificate_number_source: string | null;
     next_service_date: string | null;
     next_service_date_confidence: number;
+    next_service_date_source: string | null;
     overall_outcome: string | null;
     overall_outcome_confidence: number;
+    overall_outcome_source: string | null;
     page_count: number | null;
     client_name: string | null;
     client_name_confidence: number;
+    client_name_source: string | null;
     key_readings: { name: string; value: string; unit: string; status: string }[];
     overall_extraction_confidence: number;
     raw_text_length: number;
@@ -141,6 +152,19 @@ export interface BackendDocumentInsights {
     score_breakdown: { label: string; score: number; weight: number }[];
 }
 
+export interface BackendAgentState {
+    iterations: number;
+    steps: {
+        iteration: number;
+        tool_name: string;
+        tool_args: Record<string, unknown>;
+        result_summary: string;
+    }[];
+    tools_called: string[];
+    final_rationale: string;
+    orchestrator_routing: string | null;
+}
+
 export interface DocumentRecord {
     document_id: string;
     filename: string;
@@ -153,6 +177,7 @@ export interface DocumentRecord {
     validation_result: BackendValidationResult | null;
     remedial_result: BackendRemedialResult | null;
     confidence_score: BackendConfidenceScore | null;
+    agent_state: BackendAgentState | null;
     insights: BackendDocumentInsights | null;
     override_by: string | null;
     override_reason: string | null;

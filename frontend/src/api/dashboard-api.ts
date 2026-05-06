@@ -45,8 +45,10 @@ export function mapDocumentRecord(record: DocumentRecord): Document {
         rem?.classification === 'REMEDIAL_CRITICAL'
     ) {
         status = 'Remedial Detected';
-    } else if (record.status === 'auto_approved' || record.status === 'approved') {
+    } else if (record.status === 'auto_approved') {
         status = 'Auto-Approved';
+    } else if (record.status === 'approved') {
+        status = 'Approved';
     }
 
     // Flags: prefer pre-computed insights, fallback to manual derivation

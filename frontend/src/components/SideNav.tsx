@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
     LayoutDashboard,
-    AlertTriangle,
     Upload,
     BarChart3,
     FileSearch,
@@ -10,7 +9,6 @@ import {
 
 const navItems = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/exceptions', label: 'Exceptions', icon: AlertTriangle },
     { to: '/upload', label: 'Upload/Import', icon: Upload },
     { to: '/analytics', label: 'Analytics', icon: BarChart3 },
     { to: '/audit', label: 'Audit Log', icon: FileSearch },

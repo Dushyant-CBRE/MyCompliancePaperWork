@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Upload } from './pages/Upload';
 import { Dashboard } from './pages/Dashboard';
-import { Exceptions } from './pages/Exceptions';
 import { Settings } from './pages/Settings';
 import { AuditLog } from './pages/AuditLog';
 import { Analytics } from './pages/Analytics';
@@ -15,7 +14,6 @@ function App() {
             <Routes>
                 <Route element={<Layout />}>
                     <Route path="/" element={<Dashboard />} />
-                    <Route path="/exceptions" element={<Exceptions />} />
                     <Route path="/upload" element={<Upload />} />
                     <Route path="/analytics" element={<Analytics />} />
                     <Route path="/audit" element={<AuditLog />} />

@@ -94,12 +94,14 @@ export function DocumentReview() {
                     onTabChange={setActiveTab}
                     fields={fields}
                     checks={checks}
-                    evidence={evidence}
+                    evidence={evidence} 
+                    auditData={undefined}                
                 />
             </div>
 
             {showOverrideModal && (
-                <OverrideModal onClose={() => setShowOverrideModal(false)} />
+                <OverrideModal onClose={() => setShowOverrideModal(false)} 
+                onSubmit={() => {}}/>
             )}
 
             {showReviewModal && (

@@ -28,8 +28,14 @@ from backend.models.document import (
 
 logger = logging.getLogger(__name__)
 
+# Suppress verbose Azure HTTP request/response logging
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
+
 
 # ── Lazy client helpers ───────────────────────────────────────────────────────
+
+_table_client_cache: dict[str, object] = {}
+
 
 def _get_blob_service_client():
     """Return an Azure BlobServiceClient or None if not configured."""
@@ -46,7 +52,10 @@ def _get_blob_service_client():
 
 
 def _get_table_client(table_name: str):
-    """Return an Azure TableClient or None if not configured."""
+    """Return a cached Azure TableClient or None if not configured."""
+    if table_name in _table_client_cache:
+        return _table_client_cache[table_name]
+
     try:
         from azure.data.tables import TableServiceClient  # type: ignore
         settings = get_settings()
@@ -54,12 +63,14 @@ def _get_table_client(table_name: str):
             logger.warning("AZURE_STORAGE_CONNECTION_STRING not set – table storage disabled")
             return None
         service = TableServiceClient.from_connection_string(settings.azure_storage_connection_string)
-        # Create table if it doesn't exist
+        # Create table if it doesn't exist (runs only once)
         try:
             service.create_table_if_not_exists(table_name)
         except Exception:
             pass
-        return service.get_table_client(table_name)
+        client = service.get_table_client(table_name)
+        _table_client_cache[table_name] = client
+        return client
     except ImportError:
         logger.warning("azure-data-tables not installed – table storage disabled")
         return None
@@ -293,13 +304,37 @@ def get_document(document_id: str) -> Optional[DocumentRecord]:
     settings = get_settings()
     client = _get_table_client(settings.azure_table_name)
     if client is None:
+        # Fallback: search in document details defaults
+        defaults = _load_document_details()
+        for record in defaults:
+            if record.document_id == document_id:
+                return record
         return None
     try:
         entity = client.get_entity(partition_key="documents", row_key=document_id)
         return _entity_to_record(entity)
-    except Exception as exc:
-        logger.error("get_document failed for %s: %s", document_id, exc)
+    except Exception:
+        # Not found in Azure — try fallback defaults
+        defaults = _load_document_details()
+        for record in defaults:
+            if record.document_id == document_id:
+                return record
         return None
+
+
+def _load_document_details() -> list[DocumentRecord]:
+    """Load fallback document details from backend/data/document_details.json."""
+    import json
+    import os
+
+    details_path = os.path.join(os.path.dirname(__file__), "..", "data", "document_details.json")
+    try:
+        with open(details_path, encoding="utf-8-sig") as f:
+            data = json.load(f)
+        return [DocumentRecord.model_validate(item) for item in data]
+    except Exception as exc:
+        logger.warning("Failed to load document details: %s", exc)
+        return []
 
 
 def _load_dashboard_defaults() -> list[DocumentRecord]:
