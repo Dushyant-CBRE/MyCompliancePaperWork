@@ -94,9 +94,14 @@ export function DocumentReviewHeader({ doc, id, onAskAI, onRejectClick, onStatus
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => handleQuickReview('Approved')}
-                        disabled={!!submitting}
+                        disabled={!!submitting || doc.status.toLowerCase() === 'approved' || doc.status.toLowerCase() === 'rejected'}
                         title="Approve"
-                        className="flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-colors text-sm font-medium disabled:cursor-not-allowed ${
+                            doc.status.toLowerCase() === 'approved'
+                            || doc.status.toLowerCase() === 'rejected'
+                                ? 'bg-muted text-muted-foreground border border-border'
+                                : 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50'
+                        }`}
                     >
                         <ThumbsUp className="w-4 h-4" />
                         {submitting === 'Approved' ? 'Saving…' : 'Approve'}
@@ -105,7 +110,11 @@ export function DocumentReviewHeader({ doc, id, onAskAI, onRejectClick, onStatus
                         onClick={() => onRejectClick ? onRejectClick() : handleQuickReview('Rejected')}
                         disabled={!!submitting || doc.status.toLowerCase() === 'rejected'}
                         title="Reject"
-                        className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-colors text-sm font-medium disabled:cursor-not-allowed ${
+                            doc.status.toLowerCase() === 'rejected'
+                                ? 'bg-muted text-muted-foreground border border-border'
+                                : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50'
+                        }`}
                     >
                         <ThumbsDown className="w-4 h-4" />
                         {submitting === 'Rejected' ? 'Saving…' : 'Reject'}
@@ -123,7 +132,13 @@ export function DocumentReviewHeader({ doc, id, onAskAI, onRejectClick, onStatus
             {/* RIGHT COLUMN — matches Analysis panel (w-[480px]) */}
             <div className="w-[480px] px-6 py-4 flex flex-col justify-center gap-2">
                 <div className="flex items-center gap-2 flex-wrap justify-end">
-                    {/* <StatusBadge status={doc.status} /> */}
+                    <span className={`px-3 py-1 rounded-full border text-sm ${
+                        doc.status.toLowerCase() === 'approved'
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : doc.status.toLowerCase() === 'rejected'
+                            ? 'bg-red-50 text-red-700 border-red-200'
+                            : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                    }`}>{doc.status}</span>
                     <span className="px-3 py-1 bg-red-50 text-red-700 rounded-full border border-red-200 text-sm">{doc.aiDecision}</span>
                     <span className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full border border-orange-200 text-sm">Risk: {doc.riskLevel}</span>
                 </div>
