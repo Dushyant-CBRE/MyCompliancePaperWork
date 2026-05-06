@@ -33,11 +33,22 @@ function mapDocumentRecord(record: DocumentRecord): ReviewDocumentDetail {
     const rem = record.remedial_result;
     const insights = record.insights;
 
+    const statusLabelMap: Record<string, string> = {
+        pending: 'Pending',
+        processing: 'Processing',
+        auto_approved: 'Auto-Approved',
+        manual_review: 'Needs Review',
+        requires_attention: 'Requires Attention',
+        approved: 'Approved',
+        rejected: 'Rejected',
+    };
+
     const doc: ReviewDocument = {
         name: record.filename,
         site: ef?.site_name || meta?.expected_site_name || '—',
         ppmType: ef?.ppm_reference || meta?.expected_ppm_type || '—',
         confidence: Math.round(record.confidence_score?.overall_score ?? 0),
+        status: statusLabelMap[record.status] ?? record.status,
         aiDecision: insights?.compliance_status || record.status,
         riskLevel: insights?.risk_level || '—',
         slaRemaining: insights?.sla_remaining || '—',
@@ -45,12 +56,12 @@ function mapDocumentRecord(record: DocumentRecord): ReviewDocumentDetail {
 
     const fields: ExtractedField[] = ef
         ? [
-              { label: 'Site Name', value: ef.site_name ?? '—', confidence: Math.round(ef.site_name_confidence * 100), source: 'Extracted' },
-              { label: 'PPM Type', value: ef.ppm_reference ?? '—', confidence: Math.round(ef.ppm_reference_confidence * 100), source: 'Extracted' },
-              { label: 'Document Date', value: ef.inspection_date ?? '—', confidence: Math.round(ef.inspection_date_confidence * 100), source: 'Extracted' },
-              { label: 'Vendor Name', value: ef.vendor_name ?? '—', confidence: Math.round(ef.vendor_name_confidence * 100), source: 'Extracted' },
-              { label: 'Inspector Name', value: ef.inspector_name ?? '—', confidence: Math.round(ef.inspector_name_confidence * 100), source: 'Extracted' },
-              { label: 'Certificate Number', value: ef.certificate_number ?? '—', confidence: Math.round(ef.certificate_number_confidence * 100), source: 'Extracted' },
+              { label: 'Site Name', value: ef.site_name ?? '—', confidence: Math.round(ef.site_name_confidence), source: 'Extracted' },
+              { label: 'PPM Type', value: ef.ppm_reference ?? '—', confidence: Math.round(ef.ppm_reference_confidence), source: 'Extracted' },
+              { label: 'Document Date', value: ef.inspection_date ?? '—', confidence: Math.round(ef.inspection_date_confidence), source: 'Extracted' },
+              { label: 'Vendor Name', value: ef.vendor_name ?? '—', confidence: Math.round(ef.vendor_name_confidence), source: 'Extracted' },
+              { label: 'Inspector Name', value: ef.inspector_name ?? '—', confidence: Math.round(ef.inspector_name_confidence), source: 'Extracted' },
+              { label: 'Certificate Number', value: ef.certificate_number ?? '—', confidence: Math.round(ef.certificate_number_confidence), source: 'Extracted' },
           ]
         : [];
 

@@ -22,6 +22,7 @@ export interface ReviewDocument {
     site: string;
     ppmType: string;
     confidence: number;
+    status: string;
     aiDecision: string;
     riskLevel: string;
     slaRemaining: string;
