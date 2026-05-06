@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
     LayoutDashboard,
-    Upload,
     BarChart3,
     FileSearch,
     Settings,
@@ -9,7 +8,6 @@ import {
 
 const navItems = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/upload', label: 'Upload/Import', icon: Upload },
     { to: '/analytics', label: 'Analytics', icon: BarChart3 },
     { to: '/audit', label: 'Audit Log', icon: FileSearch },
     { to: '/settings', label: 'Settings', icon: Settings },

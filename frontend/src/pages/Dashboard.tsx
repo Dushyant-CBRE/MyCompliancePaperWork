@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Upload } from 'lucide-react';
 import type { Document, DocumentRecord, DashboardStats } from '../types/document-types';
 import { PageHeader } from '../components/PageHeader';
 import { StatCards } from '../components/dashboard/StatCards';
@@ -8,6 +10,7 @@ import { BatchApproveModal } from '../components/dashboard/BatchApproveModal';
 import { getDocuments, overrideDocument, mapDocumentRecord } from '../api/dashboard-api';
 
 export function Dashboard() {
+    const navigate = useNavigate();
     const [documents, setDocuments] = useState<Document[]>([]);
     const [rawRecords, setRawRecords] = useState<DocumentRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -73,10 +76,19 @@ export function Dashboard() {
 
     return (
         <div className="p-6">
-            <PageHeader
-                title="Document Triage"
-                subtitle="AI-powered PPM compliance validation dashboard"
-            />
+            <div className="flex items-center justify-between">
+                <PageHeader
+                    title="Document Triage"
+                    subtitle="AI-powered PPM compliance validation dashboard"
+                />
+                <button
+                    onClick={() => navigate('/upload')}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+                >
+                    <Upload className="w-4 h-4" />
+                    Upload / Import
+                </button>
+            </div>
             <StatCards stats={stats} />
             <ProcessingPipeline />
             {error && (
