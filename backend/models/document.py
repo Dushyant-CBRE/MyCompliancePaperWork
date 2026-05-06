@@ -201,6 +201,9 @@ class DocumentRecord(BaseModel):
     agent_state: Optional[AgentState] = None
     insights: Optional[DocumentInsights] = None
 
+    # Extraction provenance
+    extraction_method: Optional[str] = None   # e.g. "CU Custom Analyzer", "CU Prebuilt", "PyMuPDF", "Claude Vision"
+
     # Officer override
     override_by: Optional[str] = None
     override_reason: Optional[str] = None
@@ -322,3 +325,21 @@ class DashboardResponse(BaseModel):
     # ── Document feeds ────────────────────────────────────────────────────────
     recent_documents: list[DashboardDocumentSummary] = Field(default_factory=list)
     attention_documents: list[DashboardDocumentSummary] = Field(default_factory=list)
+
+
+# ── Audit log model ───────────────────────────────────────────────────────────
+
+class AuditLogEntry(BaseModel):
+    """A single immutable audit event written to MyPaperComplianceAudit table."""
+    entry_id: str                            # UUID row key
+    timestamp: datetime                      # when the action happened (UTC)
+    user: str                                # officer name or "System (AI)"
+    status: str                              # new status value
+    document: str                            # filename
+    document_id: str                         # document UUID for linking
+    details: str = ""                        # override reason / AI decision summary
+
+
+class AuditLogResponse(BaseModel):
+    entries: list[AuditLogEntry]
+    total: int

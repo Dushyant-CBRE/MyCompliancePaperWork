@@ -229,6 +229,8 @@ def _record_to_entity(record: DocumentRecord) -> dict:
         "confidence_score_json": record.confidence_score.model_dump_json() if record.confidence_score else "",
         "agent_state_json": record.agent_state.model_dump_json() if record.agent_state else "",
         "insights_json": record.insights.model_dump_json() if record.insights else "",
+        # ── Extraction provenance ─────────────────────────────────────────────
+        "extraction_method": record.extraction_method or "",
         # ── Officer override ─────────────────────────────────────────────────
         "override_by": record.override_by or "",
         "override_reason": record.override_reason or "",
@@ -278,6 +280,7 @@ def _entity_to_record(entity: dict) -> DocumentRecord:
         confidence_score=_parse(entity.get("confidence_score_json", ""), ConfidenceScore),
         agent_state=_parse(entity.get("agent_state_json", ""), AgentState),
         insights=_parse(entity.get("insights_json", ""), DocumentInsights),
+        extraction_method=entity.get("extraction_method") or None,
         override_by=entity.get("override_by") or None,
         override_reason=entity.get("override_reason") or None,
         overridden_at=datetime.fromisoformat(entity["overridden_at"]) if entity.get("overridden_at") else None,
@@ -595,3 +598,92 @@ def get_analytics_summary() -> AnalyticsSummary:
     )
 
     return summary
+
+
+# ── Audit log operations ──────────────────────────────────────────────────────
+
+def write_audit_log(
+    document_id: str,
+    document: str,
+    user: str,
+    status: str,
+    details: str = "",
+    timestamp: Optional[datetime] = None,
+) -> None:
+    """
+    Write a single immutable audit entry to the MyPaperComplianceAudit table.
+
+    PartitionKey = document_id (groups all events for a document together)
+    RowKey       = ISO timestamp + random suffix (guarantees uniqueness + sorts chronologically)
+    """
+    settings = get_settings()
+    client = _get_table_client(settings.azure_audit_table_name)
+    if client is None:
+        logger.warning("Audit log write skipped (no table client)")
+        return
+
+    ts = (timestamp or datetime.utcnow()).replace(microsecond=0)
+    row_key = f"{ts.isoformat()}_{uuid.uuid4().hex[:8]}"
+
+    entity = {
+        "PartitionKey": document_id,
+        "RowKey": row_key,
+        "timestamp": ts.isoformat(),
+        "user": user,
+        "status": status,
+        "document": document,
+        "document_id": document_id,
+        "details": details,
+    }
+    try:
+        client.upsert_entity(entity)
+        logger.info("Audit log written: doc=%s user=%s status=%s", document_id, user, status)
+    except Exception as exc:
+        logger.warning("Audit log write failed: %s – continuing", exc)
+
+
+def list_audit_logs(
+    document_id: Optional[str] = None,
+    limit: int = 200,
+) -> list["AuditLogEntry"]:
+    """
+    Return audit log entries from MyPaperComplianceAudit, newest first.
+    Optionally filter by document_id.
+    """
+    from backend.models.document import AuditLogEntry  # local to avoid circular
+
+    settings = get_settings()
+    client = _get_table_client(settings.azure_audit_table_name)
+    if client is None:
+        return []
+
+    try:
+        if document_id:
+            entities = client.query_entities(
+                f"PartitionKey eq '{document_id}'",
+                results_per_page=limit,
+            )
+        else:
+            entities = client.list_entities(results_per_page=limit)
+
+        entries: list[AuditLogEntry] = []
+        for entity in entities:
+            try:
+                entries.append(AuditLogEntry(
+                    entry_id=entity["RowKey"],
+                    timestamp=datetime.fromisoformat(entity["timestamp"]),
+                    user=entity.get("user", ""),
+                    status=entity.get("status", ""),
+                    document=entity.get("document", ""),
+                    document_id=entity.get("document_id", entity.get("PartitionKey", "")),
+                    details=entity.get("details", ""),
+                ))
+            except Exception:
+                continue
+
+        entries.sort(key=lambda e: e.timestamp, reverse=True)
+        return entries[:limit]
+
+    except Exception as exc:
+        logger.warning("Audit log list failed: %s", exc)
+        return []

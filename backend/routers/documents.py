@@ -30,6 +30,7 @@ from backend.services.storage_service import (
     get_pdf_from_blob_url,
     list_documents,
     save_document,
+    write_audit_log,
 )
 
 logger = logging.getLogger(__name__)
@@ -86,11 +87,21 @@ def override_document(document_id: str, body: OverrideRequest):
             detail=f"Override decision must be 'approved' or 'rejected', got '{body.decision}'.",
         )
 
+    override_ts = datetime.utcnow()
     record.status = body.decision
     record.override_by = body.officer_name
     record.override_reason = body.reason
-    record.overridden_at = datetime.utcnow()
+    record.overridden_at = override_ts
     save_document(record)
+
+    write_audit_log(
+        document_id=document_id,
+        document=record.filename,
+        user=body.officer_name,
+        status=body.decision.value if isinstance(body.decision, DocumentStatus) else str(body.decision),
+        details=body.reason or "",
+        timestamp=override_ts,
+    )
 
     logger.info(
         "Document %s overridden to %s by %s", document_id, body.decision, body.officer_name
@@ -129,6 +140,15 @@ def submit_review(document_id: str, body: ReviewRequest):
     record.override_reason = body.justification
     record.overridden_at = reviewed_at
     save_document(record)
+
+    write_audit_log(
+        document_id=document_id,
+        document=record.filename,
+        user=getattr(body, "officer_name", None) or "Officer",
+        status=new_status.value,
+        details=body.justification or "",
+        timestamp=reviewed_at,
+    )
 
     logger.info("Document %s reviewed as %s", document_id, new_status)
     return ReviewResponse(
