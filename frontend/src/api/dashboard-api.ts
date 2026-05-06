@@ -49,6 +49,8 @@ export function mapDocumentRecord(record: DocumentRecord): Document {
         status = 'Auto-Approved';
     } else if (record.status === 'approved') {
         status = 'Approved';
+    } else if (record.status === 'rejected') {
+        status = 'Rejected';
     }
 
     // Flags: prefer pre-computed insights, fallback to manual derivation

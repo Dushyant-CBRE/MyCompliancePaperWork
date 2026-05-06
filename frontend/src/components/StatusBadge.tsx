@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Clock, XCircle } from 'lucide-react';
 import type { DocStatus } from '../types/document-types';
 
 function getStatusStyle(status: DocStatus) {
@@ -11,6 +11,8 @@ function getStatusStyle(status: DocStatus) {
             return 'bg-yellow-50 text-yellow-700 border-yellow-200';
         case 'Remedial Detected':
             return 'bg-red-50 text-red-700 border-red-200';
+        case 'Rejected':
+            return 'bg-red-100 text-red-800 border-red-300';
     }
 }
 
@@ -27,6 +29,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
             {status === 'Approved' && <CheckCircle2 className="w-3 h-3" />}
             {status === 'Needs Review' && <Clock className="w-3 h-3" />}
             {status === 'Remedial Detected' && <AlertTriangle className="w-3 h-3" />}
+            {status === 'Rejected' && <XCircle className="w-3 h-3" />}
             {status}
         </span>
     );

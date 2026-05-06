@@ -14,6 +14,7 @@ export function Dashboard() {
     const [error, setError] = useState<string | null>(null);
     const [showBatchModal, setShowBatchModal] = useState(false);
     const [batchLoading, setBatchLoading] = useState(false);
+    const [hoveredStatus, setHoveredStatus] = useState<string | null>(null);
 
     const fetchDocuments = useCallback(async () => {
         try {
@@ -78,7 +79,7 @@ export function Dashboard() {
                 subtitle="AI-powered PPM compliance validation dashboard"
             />
             <StatCards stats={stats} />
-            <ProcessingPipeline />
+            <ProcessingPipeline status={hoveredStatus ?? undefined} />
             {error && (
                 <div className="mb-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
                     {error}
@@ -93,6 +94,7 @@ export function Dashboard() {
                     documents={documents}
                     onApproveAll={() => setShowBatchModal(true)}
                     onRefresh={fetchDocuments}
+                    onHoverStatus={setHoveredStatus}
                 />
             )}
             {showBatchModal && (

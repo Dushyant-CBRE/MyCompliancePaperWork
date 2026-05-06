@@ -1,4 +1,4 @@
-export type DocStatus = 'Auto-Approved' | 'Approved' | 'Needs Review' | 'Remedial Detected';
+export type DocStatus = 'Auto-Approved' | 'Approved' | 'Needs Review' | 'Remedial Detected' | 'Rejected';
 
 export interface Document {
     id: string;

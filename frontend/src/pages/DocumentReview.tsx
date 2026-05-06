@@ -110,7 +110,10 @@ export function DocumentReview() {
                 doc={doc}
                 id={id}
                 onOverride={() => setShowOverrideModal(true)}
-                onStatusChange={(newStatus) => setDoc((prev) => prev ? { ...prev, status: newStatus } : prev)}
+                onStatusChange={(newStatus) => {
+                    setDoc((prev) => prev ? { ...prev, status: newStatus } : prev);
+                    if (hasNext) goTo(ids[currentIndex + 1]);
+                }}
                 hasPrev={hasPrev}
                 hasNext={hasNext}
                 onPrev={() => hasPrev && goTo(ids[currentIndex - 1])}
