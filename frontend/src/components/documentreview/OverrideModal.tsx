@@ -5,65 +5,47 @@ interface OverrideModalProps {
     onClose: () => void;
     onSubmit: (decision: 'approved' | 'rejected', reason: string) => void;
     isLoading?: boolean;
+    lockedDecision?: 'rejected';
 }
 
-export function OverrideModal({ onClose, onSubmit, isLoading = false }: OverrideModalProps) {
-    const [reason, setReason] = useState('');
+export function OverrideModal({ onClose, onSubmit, isLoading = false, lockedDecision }: OverrideModalProps) {
     const [comments, setComments] = useState('');
-    const [decision, setDecision] = useState<'approved' | 'rejected'>('approved');
+    const [decision, setDecision] = useState<'approved' | 'rejected'>(lockedDecision ?? 'approved');
 
-    const fullReason = comments ? `${reason} — ${comments}` : reason;
-    const canSubmit = reason && reason !== 'Select a reason...' && !isLoading;
+    const canSubmit = !isLoading;
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-card rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto">
-                <h3 className="mb-4">Override AI Decision</h3>
+                <h3 className="mb-4">{lockedDecision === 'rejected' ? 'Reject Document' : 'Override AI Decision'}</h3>
 
                 <div className="space-y-4 mb-6">
                     <div>
                         <label className="block mb-2 text-sm font-medium">Decision</label>
                         <div className="flex gap-3">
                             <button
-                                onClick={() => setDecision('approved')}
+                                onClick={() => !lockedDecision && setDecision('approved')}
+                                disabled={!!lockedDecision}
                                 className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                                     decision === 'approved'
                                         ? 'bg-green-100 text-green-800 border-2 border-green-300'
-                                        : 'bg-muted hover:bg-muted/80'
-                                }`}
+                                        : 'bg-muted'
+                                } disabled:opacity-40 disabled:cursor-not-allowed`}
                             >
                                 Approve
                             </button>
                             <button
-                                onClick={() => setDecision('rejected')}
+                                onClick={() => !lockedDecision && setDecision('rejected')}
+                                disabled={!!lockedDecision}
                                 className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                                     decision === 'rejected'
                                         ? 'bg-red-100 text-red-800 border-2 border-red-300'
                                         : 'bg-muted hover:bg-muted/80'
-                                }`}
+                                } disabled:cursor-default`}
                             >
                                 Reject
                             </button>
                         </div>
-                    </div>
-
-                    <div>
-                        <label className="block mb-2 text-sm font-medium">
-                            Reason for Override
-                        </label>
-                        <select
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                            className="w-full px-4 py-2 bg-input-background rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                        >
-                            <option>Select a reason...</option>
-                            <option>Incorrect site</option>
-                            <option>Wrong date</option>
-                            <option>Missing signatures</option>
-                            <option>Incorrect PPM type</option>
-                            <option>Remedial misclassified</option>
-                            <option>Other</option>
-                        </select>
                     </div>
 
                     <div>
@@ -77,12 +59,6 @@ export function OverrideModal({ onClose, onSubmit, isLoading = false }: Override
                         />
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <input type="checkbox" id="training-feedback" className="rounded" />
-                        <label htmlFor="training-feedback" className="text-sm">
-                            Mark as training feedback to improve AI accuracy
-                        </label>
-                    </div>
                 </div>
 
                 <div className="flex gap-3">
@@ -94,7 +70,7 @@ export function OverrideModal({ onClose, onSubmit, isLoading = false }: Override
                         Cancel
                     </button>
                     <button
-                        onClick={() => canSubmit && onSubmit(decision, fullReason)}
+                        onClick={() => canSubmit && onSubmit(decision, comments)}
                         disabled={!canSubmit}
                         className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
                     >
