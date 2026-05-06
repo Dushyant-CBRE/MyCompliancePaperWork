@@ -30,8 +30,6 @@ export function Dashboard() {
 
     useEffect(() => {
         fetchDocuments();
-        const interval = setInterval(fetchDocuments, 10_000);
-        return () => clearInterval(interval);
     }, [fetchDocuments]);
 
     const stats: DashboardStats = {
@@ -94,6 +92,7 @@ export function Dashboard() {
                 <DocumentsTable
                     documents={documents}
                     onApproveAll={() => setShowBatchModal(true)}
+                    onRefresh={fetchDocuments}
                 />
             )}
             {showBatchModal && (

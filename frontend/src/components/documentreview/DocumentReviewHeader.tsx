@@ -63,9 +63,6 @@ export function DocumentReviewHeader({ doc, id, onOverride }: DocumentReviewHead
                 >
                     Override
                 </button>
-                <button className="px-6 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-sm">
-                    Request Resubmission
-                </button>
                 <button className="px-6 py-2 bg-destructive text-primary-foreground rounded-lg hover:bg-destructive/90 transition-colors text-sm">
                     Reject
                 </button>

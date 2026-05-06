@@ -26,3 +26,14 @@ export interface ReviewDocument {
     riskLevel: string;
     slaRemaining: string;
 }
+
+export interface AuditData {
+    modelDecision: string;
+    processingTime: string;
+    timestamp: string;
+    extractionScore: number;
+    validationScore: number;
+    remedialScore: number;
+    iterations?: number;
+    toolsCalled?: string[];
+}

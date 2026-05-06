@@ -1,4 +1,4 @@
-import type { ExtractedField, ValidationCheck, RemedialEvidence } from '../../types/review-types';
+import type { ExtractedField, ValidationCheck, RemedialEvidence, AuditData } from '../../types/review-types';
 import { ExtractedFieldsTab } from './ExtractedFieldsTab';
 import { ValidationChecksTab } from './ValidationChecksTab';
 import { RemedialDetectionTab } from './RemedialDetectionTab';
@@ -12,6 +12,7 @@ interface AnalysisPanelProps {
     fields: ExtractedField[];
     checks: ValidationCheck[];
     evidence: RemedialEvidence[];
+    auditData: AuditData;
 }
 
 const tabs: { id: TabId; label: string }[] = [
@@ -27,6 +28,7 @@ export function AnalysisPanel({
     fields,
     checks,
     evidence,
+    auditData,
 }: AnalysisPanelProps) {
     return (
         <div className="w-[480px] bg-card border-l border-border flex flex-col">
@@ -52,7 +54,7 @@ export function AnalysisPanel({
                 {activeTab === 'fields' && <ExtractedFieldsTab fields={fields} />}
                 {activeTab === 'validation' && <ValidationChecksTab checks={checks} />}
                 {activeTab === 'remedial' && <RemedialDetectionTab evidence={evidence} />}
-                {activeTab === 'audit' && <AuditReasoningTab />}
+                {activeTab === 'audit' && <AuditReasoningTab data={auditData} />}
             </div>
         </div>
     );
