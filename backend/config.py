@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     wso2_client_id: str = ""
     wso2_client_secret: str = ""
 
+    # ── Azure AI Content Understanding ──────────────────────────────────────
+    azure_content_understanding_endpoint: str = "https://foundrymycompliancepaperwork.services.ai.azure.com/"
+    azure_content_understanding_key: str = ""
+    azure_content_understanding_analyzer: str = "MCPAnalyzer"
+
     # ── Azure Storage (Blob + Table) ─────────────────────────────────────────
     azure_storage_connection_string: str = ""
     azure_blob_container_name: str = "mypapercompliance"

@@ -3,15 +3,16 @@ Document Processor – Orchestrator
 ───────────────────────────────────
 Ties together the full AI pipeline for a single document:
 
-  1. Upload PDF → Blob Storage  (storage_service)
-  2. Extract text from PDF       (pdf_extractor – PyMuPDF + GPT-4o Vision)
-  3. Agentic Orchestrator        (orchestrator)
-       ├─ Agent 1: Field Extraction   (extraction_agent)   ← called via tool
-       ├─ Agent 2: Validation         (validation_agent)   ← called via tool
-       ├─ Agent 3: Remedial Detection (remedial_agent)     ← called via tool
+  1. Upload PDF → Blob Storage              (storage_service)
+  2a. Content Understanding custom analyzer  (content_understanding) ← skips Agent 1 if successful
+  2b. Extract text from PDF                  (pdf_extractor: CU prebuilt → PyMuPDF → Claude Vision)
+  3. Agentic Orchestrator                    (orchestrator)
+       ├─ Agent 1: Field Extraction   (extraction_agent)   ← skipped if step 2a succeeded
+       ├─ Agent 2: Validation         (validation_agent)
+       ├─ Agent 3: Remedial Detection (remedial_agent)
        └─ Feedback loops / re-extraction as needed
-  4. Confidence Scoring          (confidence_scorer)
-  5. Persist full result          (storage_service)
+  4. Confidence Scoring                      (confidence_scorer)
+  5. Persist full result                     (storage_service)
 
 Each step updates the document status so the dashboard can track progress in
 near real-time.
@@ -67,22 +68,35 @@ def process_document(
     save_document(record)
 
     try:
-        # ── Step 2: PDF Text Extraction ──────────────────────────────────────
-        logger.info("[%s] Step 2: Extracting text from PDF", document_id)
+        # ── Step 2a: Content Understanding custom analyzer ────────────────────
+        # Try the trained compliance-cert-analyzer first. If it returns
+        # structured fields we skip Agent 1 (extraction) entirely.
+        cu_extracted_fields = None
+        try:
+            from backend.services.content_understanding import extract_with_custom_analyzer
+            logger.info("[%s] Step 2a: Trying Content Understanding custom analyzer", document_id)
+            cu_extracted_fields = extract_with_custom_analyzer(pdf_bytes)
+            if cu_extracted_fields:
+                logger.info("[%s] Custom analyzer succeeded — Agent 1 will be skipped", document_id)
+        except Exception as cu_exc:
+            logger.warning("[%s] Custom analyzer unavailable: %s", document_id, cu_exc)
+
+        # ── Step 2b: PDF Text Extraction (prebuilt CU → PyMuPDF → Claude Vision) ──
+        logger.info("[%s] Step 2b: Extracting text from PDF", document_id)
         document_text = extract_text_from_pdf(pdf_bytes)
 
         # Persist text to blob so the Q&A endpoint can retrieve it later
         save_document_text(document_id, document_text)
 
-        # ── Step 3: Agentic Orchestrator ─────────────────────────────────────
-        # The orchestrator runs an agentic loop: it calls extraction, validation,
-        # and remedial tools in an order it decides, looping back to re-extract
-        # low-confidence fields before validating.
+        # ── Step 3: Agentic Orchestrator ───────────────────────────────────
+        # Pass pre_extracted_fields so the orchestrator can skip Agent 1
+        # when the custom analyzer already provided structured fields.
         logger.info("[%s] Step 3: Running Agentic Orchestrator", document_id)
         extracted_fields, validation_result, remedial_result, agent_state = run_orchestrator(
             document_text=document_text,
             metadata=metadata,
             document_id=document_id,
+            pre_extracted_fields=cu_extracted_fields,
         )
 
         record.extracted_fields = extracted_fields

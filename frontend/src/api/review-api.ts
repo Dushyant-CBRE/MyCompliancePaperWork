@@ -7,8 +7,6 @@ import type {
 } from '../types/review-types';
 import type { DocumentRecord } from '../types/document-types';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
-
 export interface ReviewDocumentDetail {
     doc: ReviewDocument;
     fields: ExtractedField[];
@@ -18,7 +16,7 @@ export interface ReviewDocumentDetail {
 }
 
 export async function getDocumentForReview(id: string): Promise<ReviewDocumentDetail> {
-    const res = await fetch(`${BASE_URL}/api/documents/${id}`);
+    const res = await fetch(`/api/documents/${id}`);
     if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { detail?: string };
         throw new Error(data.detail ?? `Failed to fetch document (${res.status})`);
@@ -86,7 +84,7 @@ function mapDocumentRecord(record: DocumentRecord): ReviewDocumentDetail {
  * The caller is responsible for calling URL.revokeObjectURL() when done.
  */
 export async function getPdfObjectUrl(documentId: string): Promise<string> {
-    const res = await fetch(`${BASE_URL}/api/documents/${documentId}/file`);
+    const res = await fetch(`/api/documents/${documentId}/file`);
     if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { detail?: string };
         throw new Error(data.detail ?? `Failed to fetch PDF (${res.status})`);
@@ -99,7 +97,7 @@ export async function submitReview(
     documentId: string,
     body: ReviewRequest,
 ): Promise<ReviewResponse> {
-    const res = await fetch(`${BASE_URL}/api/documents/${documentId}/review`, {
+    const res = await fetch(`/api/documents/${documentId}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

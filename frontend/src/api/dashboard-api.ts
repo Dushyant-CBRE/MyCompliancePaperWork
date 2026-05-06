@@ -6,13 +6,11 @@
     DocStatus,
 } from '../types/document-types';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
 export async function getDocuments(status?: string, limit = 50): Promise<DocumentListResponse> {
     const params = new URLSearchParams({ limit: String(limit) });
     if (status) params.append('status', status);
 
-    const res = await fetch(`${BASE_URL}/api/documents?${params}`);
+    const res = await fetch(`/api/documents?${params}`);
     if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `Failed to fetch documents (${res.status})`);
@@ -21,7 +19,7 @@ export async function getDocuments(status?: string, limit = 50): Promise<Documen
 }
 
 export async function overrideDocument(id: string, body: OverrideRequest): Promise<DocumentRecord> {
-    const res = await fetch(`${BASE_URL}/api/documents/${id}/override`, {
+    const res = await fetch(`/api/documents/${id}/override`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
