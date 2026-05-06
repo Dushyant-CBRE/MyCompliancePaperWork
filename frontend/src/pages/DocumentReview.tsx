@@ -5,6 +5,8 @@ import { DocumentReviewHeader } from '../components/documentreview/DocumentRevie
 import { PDFViewerPanel } from '../components/documentreview/PDFViewerPanel';
 import { AnalysisPanel } from '../components/documentreview/AnalysisPanel';
 import { OverrideModal } from '../components/documentreview/OverrideModal';
+import { ReviewModal } from '../components/documentreview/ReviewModal';
+import { submitReview } from '../api/review-api';
 
 type TabId = 'fields' | 'validation' | 'remedial' | 'audit';
 
@@ -71,6 +73,7 @@ export function DocumentReview() {
     const { id } = useParams();
     const [activeTab, setActiveTab] = useState<TabId>('fields');
     const [showOverrideModal, setShowOverrideModal] = useState(false);
+    const [showReviewModal, setShowReviewModal] = useState(false);
 
     return (
         <div className="h-full flex flex-col">
@@ -78,6 +81,7 @@ export function DocumentReview() {
                 doc={mockDoc}
                 id={id}
                 onOverride={() => setShowOverrideModal(true)}
+                onReview={() => setShowReviewModal(true)}
             />
 
             <div className="flex-1 flex overflow-hidden">
@@ -93,6 +97,16 @@ export function DocumentReview() {
 
             {showOverrideModal && (
                 <OverrideModal onClose={() => setShowOverrideModal(false)} />
+            )}
+
+            {showReviewModal && (
+                <ReviewModal
+                    documentId={id ?? ''}
+                    onClose={() => setShowReviewModal(false)}
+                    onSubmit={async (status, justification) => {
+                        await submitReview(id ?? '', { status, justification });
+                    }}
+                />
             )}
         </div>
     );

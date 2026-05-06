@@ -21,6 +21,8 @@ from backend.models.document import (
     DocumentRecord,
     DocumentStatus,
     OverrideRequest,
+    ReviewRequest,
+    ReviewResponse,
 )
 from backend.services.storage_service import (
     get_document,
@@ -93,6 +95,47 @@ def override_document(document_id: str, body: OverrideRequest):
         "Document %s overridden to %s by %s", document_id, body.decision, body.officer_name
     )
     return record
+
+
+@router.post("/{document_id}/review", response_model=ReviewResponse)
+def submit_review(document_id: str, body: ReviewRequest):
+    """
+    Officer review submission – approve or reject a document after manual review.
+    Accepts {"status": "Approved"|"Rejected", "justification": "..."}
+    """
+    record = get_document(document_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Document '{document_id}' not found.")
+
+    if record.status == DocumentStatus.PROCESSING:
+        raise HTTPException(
+            status_code=409, detail="Document is still being processed. Please wait."
+        )
+
+    status_map = {
+        "approved": DocumentStatus.APPROVED,
+        "rejected": DocumentStatus.REJECTED,
+    }
+    new_status = status_map.get(body.status.lower())
+    if new_status is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"status must be 'Approved' or 'Rejected', got '{body.status}'.",
+        )
+
+    reviewed_at = datetime.utcnow()
+    record.status = new_status
+    record.override_reason = body.justification
+    record.overridden_at = reviewed_at
+    save_document(record)
+
+    logger.info("Document %s reviewed as %s", document_id, new_status)
+    return ReviewResponse(
+        document_id=document_id,
+        status=new_status,
+        justification=body.justification,
+        reviewed_at=reviewed_at,
+    )
 
 
 @router.get("/{document_id}/pdf")

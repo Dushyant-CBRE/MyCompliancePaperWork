@@ -26,3 +26,16 @@ export interface ReviewDocument {
     riskLevel: string;
     slaRemaining: string;
 }
+
+export interface ReviewRequest {
+    status: 'Approved' | 'Rejected';
+    justification: string;
+}
+
+export interface ReviewResponse {
+    id: string;
+    status: 'Approved' | 'Rejected';
+    justification: string;
+    reviewedAt: string;
+    reviewedBy?: string;
+}
