@@ -1,6 +1,5 @@
-import { ArrowLeft, ArrowRight, FileText, ThumbsUp, ThumbsDown, MessageCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { ReviewDocument } from '../../types/review-types';
 import { submitReview } from '../../api/review-api';
 
@@ -21,7 +20,6 @@ import { submitReview } from '../../api/review-api';
 interface DocumentReviewHeaderProps {
     doc: ReviewDocument;
     id: string | undefined;
-    onOverride: () => void;
     onAskAI: () => void;
     onRejectClick?: () => void;
     onStatusChange?: (newStatus: string) => void;
@@ -33,8 +31,7 @@ interface DocumentReviewHeaderProps {
     totalCount?: number;
 }
 
-export function DocumentReviewHeader({ doc, id, onOverride, onAskAI, onRejectClick, onStatusChange, onPrev, onNext, hasPrev, hasNext }: DocumentReviewHeaderProps) {
-    const navigate = useNavigate();
+export function DocumentReviewHeader({ doc, id, onAskAI, onRejectClick, onStatusChange, onPrev, onNext, hasPrev, hasNext }: DocumentReviewHeaderProps) {
     const [submitting, setSubmitting] = useState<'Approved' | 'Rejected' | null>(null);
 
     const handleQuickReview = async (status: 'Approved' | 'Rejected') => {
@@ -57,13 +54,6 @@ export function DocumentReviewHeader({ doc, id, onOverride, onAskAI, onRejectCli
                 {/* Nav row: Back + Prev | Title | Next */}
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 shrink-0">
-                        <button
-                            onClick={() => navigate('/')}
-                            className="p-2 hover:bg-muted rounded-lg transition-colors"
-                            title="Back to dashboard"
-                        >
-                            <ArrowLeft className="w-5 h-5" />
-                        </button>
                         <button
                             onClick={onPrev}
                             disabled={!hasPrev}
@@ -100,13 +90,13 @@ export function DocumentReviewHeader({ doc, id, onOverride, onAskAI, onRejectCli
                     </div>
                 </div>
 
-                {/* Action row: Approve | Reject | Override */}
+                {/* Action row: Approve | Reject | Ask AI */}
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => handleQuickReview('Approved')}
                         disabled={!!submitting}
                         title="Approve"
-                        className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <ThumbsUp className="w-4 h-4" />
                         {submitting === 'Approved' ? 'Saving…' : 'Approve'}
@@ -115,16 +105,16 @@ export function DocumentReviewHeader({ doc, id, onOverride, onAskAI, onRejectCli
                         onClick={() => onRejectClick ? onRejectClick() : handleQuickReview('Rejected')}
                         disabled={!!submitting || doc.status.toLowerCase() === 'rejected'}
                         title="Reject"
-                        className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <ThumbsDown className="w-4 h-4" />
                         {submitting === 'Rejected' ? 'Saving…' : 'Reject'}
                     </button>
                     <button
                         onClick={onAskAI}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
+                        className="flex items-center gap-1.5 px-4 py-2 bg-green-800 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
                     >
-                        <MessageCircle className="w-4 h-4" />
+                        <img src="/EllisIcon.png" alt="" className="w-5 h-5" />
                         Ask AI
                     </button>
                 </div>

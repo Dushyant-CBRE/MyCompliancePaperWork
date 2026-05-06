@@ -125,7 +125,6 @@ export function DocumentReview() {
             <DocumentReviewHeader
                 doc={doc}
                 id={id}
-                onOverride={() => setShowOverrideModal(true)}
                 onRejectClick={() => setShowOverrideModal(true)}
                 onStatusChange={(newStatus) => {
                     setDoc((prev) => prev ? { ...prev, status: newStatus } : prev);
