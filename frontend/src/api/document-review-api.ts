@@ -7,10 +7,12 @@ import type {
     AuditData,
 } from '../types/review-types';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
 // ── API functions ────────────────────────────────────────────────────────────
 
 export async function getDocumentById(id: string): Promise<DocumentRecord> {
-    const res = await fetch(`/api/documents/${id}`);
+    const res = await fetch(`${API_BASE}/api/documents/${id}`);
     if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `Failed to fetch document (${res.status})`);
@@ -19,7 +21,7 @@ export async function getDocumentById(id: string): Promise<DocumentRecord> {
 }
 
 export async function overrideDocument(id: string, body: OverrideRequest): Promise<DocumentRecord> {
-    const res = await fetch(`/api/documents/${id}/override`, {
+    const res = await fetch(`${API_BASE}/api/documents/${id}/override`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -32,7 +34,7 @@ export async function overrideDocument(id: string, body: OverrideRequest): Promi
 }
 
 export function getDocumentPdfUrl(id: string): string {
-    return `/api/documents/${id}/pdf`;
+    return `${API_BASE}/api/documents/${id}/pdf`;
 }
 
 // ── Mapping helpers ──────────────────────────────────────────────────────────
@@ -41,10 +43,9 @@ function deriveAiDecision(record: DocumentRecord): string {
     const classification = record.remedial_result?.classification;
     if (classification === 'REMEDIAL_CRITICAL') return 'Remedial Critical';
     if (classification === 'REMEDIAL_MINOR') return 'Remedial Minor';
-    if (record.status === 'auto_approved' || record.status === 'approved') return 'AI Approved';
+    if (record.status === 'auto_approved' || record.status === 'approved') return 'Approved';
     if (record.status === 'rejected') return 'Rejected';
-    if (record.status === 'manual_review' || record.status === 'requires_attention') return 'Needs Review';
-    return 'Processing';
+    return 'Needs Review';
 }
 
 function deriveRiskLevel(record: DocumentRecord): string {
@@ -200,6 +201,7 @@ export function mapDocumentToReview(record: DocumentRecord): {
         site: ef?.site_name || meta?.expected_site_name || 'Unknown',
         ppmType: ef?.document_type || meta?.expected_ppm_type || 'Unknown',
         confidence: Math.round(record.confidence_score?.overall_score ?? 0),
+        status: deriveAiDecision(record),
         aiDecision: deriveAiDecision(record),
         riskLevel: deriveRiskLevel(record),
         slaRemaining: record.insights?.sla_remaining ?? '\u2014',

@@ -5,8 +5,6 @@ import type { Stage } from '../lib/constants';
 import { PageHeader } from '../components/PageHeader';
 import { DropZone } from '../components/upload/DropZone';
 import { UploadPipelineCard } from '../components/upload/UploadPipelineCard';
-import { MetadataForm } from '../components/upload/MetadataForm';
-import type { MetadataValues } from '../components/upload/MetadataForm';
 import { uploadDocument } from '../api/upload-api';
 
 export function Upload() {
@@ -17,13 +15,6 @@ export function Upload() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [documentId, setDocumentId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [metadata, setMetadata] = useState<MetadataValues>({
-        expected_site_name: '',
-        expected_ppm_type: '',
-        expected_document_date: '',
-        expected_vendor_name: '',
-        smartsheet: false,
-    });
 
     const handleUpload = async (file: File) => {
         if (!file.name.toLowerCase().endsWith('.pdf')) {
@@ -48,17 +39,11 @@ export function Upload() {
             }
         }, 3000);
 
-        const notes = [
-            metadata.smartsheet ? 'Imported from Smartsheet' : '',
-        ].filter(Boolean).join('; ') || undefined;
+        const notes = undefined;
 
         try {
             const result = await uploadDocument(file, {
-                expected_site_name: metadata.expected_site_name || undefined,
-                expected_ppm_type: metadata.expected_ppm_type || undefined,
-                expected_document_date: metadata.expected_document_date || undefined,
                 expected_document_type: file.name.split('.')[1] || undefined,
-                expected_vendor_name: metadata.expected_vendor_name || undefined,
                 notes,
             });
             clearInterval(stageTimer);
@@ -115,7 +100,6 @@ export function Upload() {
                         onOpenReview={() => navigate(`/document/${documentId}`)}
                     />
                 )}
-                <MetadataForm values={metadata} onChange={setMetadata} />
             </div>
         </div>
     );

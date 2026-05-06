@@ -1,19 +1,37 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Upload } from 'lucide-react';
 import type { Document, DocumentRecord, DashboardStats } from '../types/document-types';
 import { PageHeader } from '../components/PageHeader';
 import { StatCards } from '../components/dashboard/StatCards';
+import type { FilterKey } from '../components/dashboard/StatCards';
 import { ProcessingPipeline } from '../components/dashboard/ProcessingPipeline';
 import { DocumentsTable } from '../components/dashboard/DocumentsTable';
 import { BatchApproveModal } from '../components/dashboard/BatchApproveModal';
 import { getDocuments, overrideDocument, mapDocumentRecord } from '../api/dashboard-api';
 
 export function Dashboard() {
+    const navigate = useNavigate();
     const [documents, setDocuments] = useState<Document[]>([]);
     const [rawRecords, setRawRecords] = useState<DocumentRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showBatchModal, setShowBatchModal] = useState(false);
     const [batchLoading, setBatchLoading] = useState(false);
+    const [hoveredStatus, setHoveredStatus] = useState<string | null>(null);
+    const [activeFilters, setActiveFilters] = useState<FilterKey[]>([]);
+
+    const filteredDocuments = activeFilters.length > 0
+        ? documents.filter(d => {
+            const s = d.status.toLowerCase();
+            return activeFilters.some(f => {
+                if (f === 'Approved') return s === 'approved' || s === 'auto-approved' || s === 'auto_approved';
+                if (f === 'Needs Review') return s === 'needs review' || s === 'manual_review' || s === 'remedial detected' || s === 'requires_attention';
+                if (f === 'Rejected') return s === 'rejected';
+                return false;
+            });
+          })
+        : documents;
 
     const fetchDocuments = useCallback(async () => {
         try {
@@ -34,16 +52,12 @@ export function Dashboard() {
 
     const stats: DashboardStats = {
         totalDocuments: rawRecords.length,
-        autoApproved: rawRecords.filter(r => r.status === 'auto_approved' || r.status === 'approved').length,
-        needsReview: rawRecords.filter(r => r.status === 'manual_review' || r.status === 'requires_attention').length,
-        remedialDetected: rawRecords.filter(r =>
-            r.remedial_result?.classification === 'REMEDIAL_MINOR' ||
-            r.remedial_result?.classification === 'REMEDIAL_CRITICAL'
-        ).length,
-        criticalCount: rawRecords.filter(r => r.remedial_result?.classification === 'REMEDIAL_CRITICAL').length,
+        approved: rawRecords.filter(r => r.status === 'auto_approved' || r.status === 'approved').length,
+        needsReview: rawRecords.filter(r => r.status === 'manual_review' || r.status === 'requires_attention' || r.status === 'pending' || r.status === 'processing').length,
+        rejected: rawRecords.filter(r => r.status === 'rejected').length,
     };
 
-    const eligibleCount = documents.filter(d => d.confidence >= 85 && d.status !== 'Auto-Approved').length;
+    const eligibleCount = documents.filter(d => d.confidence >= 85 && d.status !== 'Approved').length;
 
     const handleBatchApprove = async () => {
         setBatchLoading(true);
@@ -73,12 +87,21 @@ export function Dashboard() {
 
     return (
         <div className="p-6">
-            <PageHeader
-                title="Document Triage"
-                subtitle="AI-powered PPM compliance validation dashboard"
-            />
-            <StatCards stats={stats} />
-            <ProcessingPipeline />
+            <div className="flex items-center justify-between">
+                <PageHeader
+                    title="Document Triage"
+                    subtitle="AI-powered PPM compliance validation dashboard"
+                />
+                <button
+                    onClick={() => navigate('/upload')}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+                >
+                    <Upload className="w-4 h-4" />
+                    Upload / Import
+                </button>
+            </div>
+            <StatCards stats={stats} activeFilters={activeFilters} onFilterChange={setActiveFilters} />
+            <ProcessingPipeline status={hoveredStatus ?? undefined} />
             {error && (
                 <div className="mb-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
                     {error}
@@ -90,9 +113,10 @@ export function Dashboard() {
                 </div>
             ) : (
                 <DocumentsTable
-                    documents={documents}
+                    documents={filteredDocuments}
                     onApproveAll={() => setShowBatchModal(true)}
                     onRefresh={fetchDocuments}
+                    onHoverStatus={setHoveredStatus}
                 />
             )}
             {showBatchModal && (

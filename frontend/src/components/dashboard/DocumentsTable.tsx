@@ -8,9 +8,10 @@ interface DocumentsTableProps {
     documents: Document[];
     onApproveAll: () => void;
     onRefresh: () => void;
+    onHoverStatus?: (status: string | null) => void;
 }
 
-export function DocumentsTable({ documents, onApproveAll, onRefresh }: DocumentsTableProps) {
+export function DocumentsTable({ documents, onApproveAll, onRefresh, onHoverStatus }: DocumentsTableProps) {
     const navigate = useNavigate();
     const ids = documents.map((d) => d.id);
     return (
@@ -83,7 +84,9 @@ export function DocumentsTable({ documents, onApproveAll, onRefresh }: Documents
                             <tr
                                 key={doc.id}
                                 onClick={() => navigate(`/document/${doc.id}`, { state: { ids } })}
-                                className="hover:bg-muted/30 transition-colors cursor-pointer"
+                                onMouseEnter={() => onHoverStatus?.(doc.status)}
+                                onMouseLeave={() => onHoverStatus?.(null)}
+                                className="hover:bg-grey/40 border-l-2 border-l-transparent hover:border-l-primary transition-colors cursor-pointer group"
                             >
                                 <td className="px-6 py-4 text-sm font-medium">
                                     {doc.site}

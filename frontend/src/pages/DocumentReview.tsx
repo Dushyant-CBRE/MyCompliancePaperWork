@@ -5,7 +5,8 @@ import { DocumentReviewHeader } from '../components/documentreview/DocumentRevie
 import { PDFViewerPanel } from '../components/documentreview/PDFViewerPanel';
 import { AnalysisPanel } from '../components/documentreview/AnalysisPanel';
 import { OverrideModal } from '../components/documentreview/OverrideModal';
-import { getDocumentForReview, getPdfObjectUrl } from '../api/review-api';
+import { AskAIPanel } from '../components/documentreview/AskAIPanel';
+import { getDocumentForReview, getPdfObjectUrl, submitReview } from '../api/review-api';
 import { getDocuments } from '../api/dashboard-api';
 
 type TabId = 'fields' | 'validation' | 'remedial' | 'audit';
@@ -17,6 +18,8 @@ export function DocumentReview() {
 
     const [activeTab, setActiveTab] = useState<TabId>('fields');
     const [showOverrideModal, setShowOverrideModal] = useState(false);
+    const [overrideLoading, setOverrideLoading] = useState(false);
+    const [showAskAI, setShowAskAI] = useState(false);
 
     // ID list for prev/next — comes from router state or is fetched as fallback
     const [ids, setIds] = useState<string[]>((location.state as { ids?: string[] } | null)?.ids ?? []);
@@ -88,6 +91,19 @@ export function DocumentReview() {
         };
     }, [id]);
 
+    const handleRejectSubmit = async (_decision: 'approved' | 'rejected', reason: string) => {
+        if (!id) return;
+        setOverrideLoading(true);
+        try {
+            const response = await submitReview(id, { status: 'Rejected', justification: reason });
+            setShowOverrideModal(false);
+            setDoc((prev) => prev ? { ...prev, status: response.status } : prev);
+            if (hasNext) goTo(ids[currentIndex + 1]);
+        } finally {
+            setOverrideLoading(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
@@ -110,7 +126,12 @@ export function DocumentReview() {
                 doc={doc}
                 id={id}
                 onOverride={() => setShowOverrideModal(true)}
-                onStatusChange={(newStatus) => setDoc((prev) => prev ? { ...prev, status: newStatus } : prev)}
+                onRejectClick={() => setShowOverrideModal(true)}
+                onStatusChange={(newStatus) => {
+                    setDoc((prev) => prev ? { ...prev, status: newStatus } : prev);
+                    if (hasNext) goTo(ids[currentIndex + 1]);
+                }}
+                onAskAI={() => setShowAskAI(true)}
                 hasPrev={hasPrev}
                 hasNext={hasNext}
                 onPrev={() => hasPrev && goTo(ids[currentIndex - 1])}
@@ -132,8 +153,20 @@ export function DocumentReview() {
             </div>
 
             {showOverrideModal && (
-                <OverrideModal onClose={() => setShowOverrideModal(false)} 
-                onSubmit={() => {}}/>
+                <OverrideModal
+                    onClose={() => setShowOverrideModal(false)}
+                    onSubmit={handleRejectSubmit}
+                    isLoading={overrideLoading}
+                    lockedDecision="rejected"
+                />
+            )}
+
+            {id && (
+                <AskAIPanel
+                    documentId={id}
+                    isOpen={showAskAI}
+                    onClose={() => setShowAskAI(false)}
+                />
             )}
         </div>
     );

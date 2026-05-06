@@ -1,27 +1,29 @@
-import { ArrowLeft, ArrowRight, FileText, Clock, ThumbsUp, ThumbsDown, SlidersHorizontal, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, ThumbsUp, ThumbsDown, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ReviewDocument } from '../../types/review-types';
 import { submitReview } from '../../api/review-api';
 
-function StatusBadge({ status }: { status: string }) {
-    const s = status.toLowerCase();
-    let cls = 'bg-yellow-50 text-yellow-700 border-yellow-200';
-    let Icon = Clock;
-    if (s === 'approved' || s === 'auto-approved') { cls = 'bg-green-50 text-green-700 border-green-200'; Icon = CheckCircle2; }
-    else if (s === 'rejected' || s === 'requires attention') { cls = 'bg-red-50 text-red-700 border-red-200'; Icon = AlertTriangle; }
-    return (
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium ${cls}`}>
-            <Icon className="w-3 h-3" />
-            {status}
-        </span>
-    );
-}
+// function StatusBadge({ status }: { status: string }) {
+//     const s = status.toLowerCase();
+//     let cls = 'bg-yellow-50 text-yellow-700 border-yellow-200';
+//     let Icon = Clock;
+//     if (s === 'approved') { cls = 'bg-green-50 text-green-700 border-green-200'; Icon = CheckCircle2; }
+//     else if (s === 'rejected') { cls = 'bg-red-50 text-red-700 border-red-200'; Icon = AlertTriangle; }
+//     return (
+//         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium ${cls}`}>
+//             <Icon className="w-3 h-3" />
+//             {status}
+//         </span>
+//     );
+// }
 
 interface DocumentReviewHeaderProps {
     doc: ReviewDocument;
     id: string | undefined;
     onOverride: () => void;
+    onAskAI: () => void;
+    onRejectClick?: () => void;
     onStatusChange?: (newStatus: string) => void;
     onPrev?: () => void;
     onNext?: () => void;
@@ -31,7 +33,7 @@ interface DocumentReviewHeaderProps {
     totalCount?: number;
 }
 
-export function DocumentReviewHeader({ doc, id, onOverride, onStatusChange, onPrev, onNext, hasPrev, hasNext }: DocumentReviewHeaderProps) {
+export function DocumentReviewHeader({ doc, id, onOverride, onAskAI, onRejectClick, onStatusChange, onPrev, onNext, hasPrev, hasNext }: DocumentReviewHeaderProps) {
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState<'Approved' | 'Rejected' | null>(null);
 
@@ -110,8 +112,8 @@ export function DocumentReviewHeader({ doc, id, onOverride, onStatusChange, onPr
                         {submitting === 'Approved' ? 'Saving…' : 'Approve'}
                     </button>
                     <button
-                        onClick={() => handleQuickReview('Rejected')}
-                        disabled={!!submitting}
+                        onClick={() => onRejectClick ? onRejectClick() : handleQuickReview('Rejected')}
+                        disabled={!!submitting || doc.status.toLowerCase() === 'rejected'}
                         title="Reject"
                         className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -119,11 +121,11 @@ export function DocumentReviewHeader({ doc, id, onOverride, onStatusChange, onPr
                         {submitting === 'Rejected' ? 'Saving…' : 'Reject'}
                     </button>
                     <button
-                        onClick={onOverride}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-sm font-medium shadow-sm"
+                        onClick={onAskAI}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
                     >
-                        <SlidersHorizontal className="w-4 h-4" />
-                        Override
+                        <MessageCircle className="w-4 h-4" />
+                        Ask AI
                     </button>
                 </div>
             </div>
@@ -131,7 +133,7 @@ export function DocumentReviewHeader({ doc, id, onOverride, onStatusChange, onPr
             {/* RIGHT COLUMN — matches Analysis panel (w-[480px]) */}
             <div className="w-[480px] px-6 py-4 flex flex-col justify-center gap-2">
                 <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <StatusBadge status={doc.status} />
+                    {/* <StatusBadge status={doc.status} /> */}
                     <span className="px-3 py-1 bg-red-50 text-red-700 rounded-full border border-red-200 text-sm">{doc.aiDecision}</span>
                     <span className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full border border-orange-200 text-sm">Risk: {doc.riskLevel}</span>
                 </div>
@@ -145,10 +147,6 @@ export function DocumentReviewHeader({ doc, id, onOverride, onStatusChange, onPr
                             />
                         </div>
                         <span className="text-sm">{doc.confidence}%</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4" />
-                        <span>SLA: {doc.slaRemaining}</span>
                     </div>
                 </div>
             </div>

@@ -6,12 +6,13 @@ interface AuditTableProps {
 
 function getActionColor(action: string): string {
     switch (action) {
-        case 'Auto-Approved':
+        case 'Approved':
         case 'Batch Approve':
             return 'bg-green-50 text-green-800 border-green-200';
-        case 'Override':
+        case 'Needs Review':
             return 'bg-yellow-50 text-yellow-800 border-yellow-200';
         case 'Reject':
+        case 'Rejected':
             return 'bg-red-50 text-red-800 border-red-200';
         case 'Remedial Detected':
             return 'bg-orange-50 text-orange-800 border-orange-200';

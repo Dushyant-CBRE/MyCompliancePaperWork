@@ -1,10 +1,11 @@
 import type { AuditData } from '../../types/review-types';
 
 interface AuditReasoningTabProps {
-    data: AuditData;
+    data?: AuditData;
 }
 
 export function AuditReasoningTab({ data }: AuditReasoningTabProps) {
+    if (!data) return null;
     return (
         <div className="space-y-4">
             <h3 className="mb-4">AI Decision Reasoning</h3>
