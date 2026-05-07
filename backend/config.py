@@ -49,6 +49,18 @@ class Settings(BaseSettings):
     azure_table_name: str = "MyPaperCompliance"
     azure_audit_table_name: str = "MyPaperComplianceAudit"
 
+    # ── PGVector (vector RAG) ────────────────────────────────────────────────
+    pgvector_host: str = ""
+    pgvector_port: int = 5432
+    pgvector_db: str = "pgvector"
+    pgvector_user: str = ""
+    pgvector_password: str = ""
+
+    # ── Azure AI Foundry Embeddings ──────────────────────────────────────────
+    azure_embedding_endpoint: str = ""
+    azure_embedding_key: str = ""
+    azure_embedding_deployment: str = "text-embedding-3-small"
+
     # ── Processing settings ──────────────────────────────────────────────────
     confidence_auto_approve_threshold: float = 85.0
     confidence_manual_review_threshold: float = 60.0

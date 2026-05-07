@@ -24,6 +24,7 @@ import json
 import logging
 from typing import Optional
 
+from backend.agents.critic_agent import CriticFeedback, run_critic
 from backend.agents.tools import TOOL_SCHEMAS, OrchestratorContext, dispatch_tool
 from backend.config import get_settings
 from backend.models.document import (
@@ -242,6 +243,83 @@ def run_orchestrator(
     agent_state.final_rationale = ctx.rationale
     agent_state.orchestrator_routing = ctx.routing_decision
 
+    # ── Critic / self-reflection pass ─────────────────────────────────────────
+    # Only run critic when both remedial AND validation tools have fired,
+    # i.e., there is meaningful output to review.
+    extracted_final = ctx.extracted_fields or ExtractedFields(raw_text_length=len(document_text))
+    validation_final = ctx.validation_result or ValidationResult()
+    remedial_final   = ctx.remedial_result or RemedialResult()
+
+    ran_remedial = "detect_remedial_issues" in agent_state.tools_called
+    ran_validate = "validate_document" in agent_state.tools_called
+
+    if ran_remedial and ran_validate:
+        try:
+            critic_feedback: CriticFeedback = run_critic(
+                document_text=document_text,
+                extracted_fields=extracted_final.dict() if hasattr(extracted_final, "dict") else {},
+                validation_result=validation_final.dict() if hasattr(validation_final, "dict") else {},
+                remedial_result=remedial_final.dict() if hasattr(remedial_final, "dict") else {},
+            )
+
+            agent_state.tools_called.append("critic_review")
+            agent_state.steps.append(
+                OrchestratorStep(
+                    iteration=iteration + 1,
+                    tool_name="critic_review",
+                    tool_args={},
+                    result_summary=(
+                        f"agreed={critic_feedback.agreed}, "
+                        f"concerns={len(critic_feedback.concerns)}, "
+                        f"delta={critic_feedback.confidence_delta:+.2f}, "
+                        f"revised_classification={critic_feedback.revised_classification}"
+                    ),
+                )
+            )
+
+            if not critic_feedback.agreed:
+                logger.info(
+                    "[%s] Critic DISAGREES — concerns: %s",
+                    document_id,
+                    critic_feedback.concerns,
+                )
+                # Escalate classification if critic demands it
+                if critic_feedback.revised_classification in ("REMEDIAL", "REMEDIAL_CRITICAL"):
+                    if ctx.routing_decision == "AUTO_APPROVED":
+                        ctx.routing_decision = "MANUAL_REVIEW"
+                        ctx.rationale = (
+                            f"Critic escalated from AUTO_APPROVED to MANUAL_REVIEW. "
+                            f"Concerns: {'; '.join(critic_feedback.concerns)}"
+                        )
+                # Apply confidence delta
+                if critic_feedback.confidence_delta != 0.0 and extracted_final:
+                    old_conf = extracted_final.overall_extraction_confidence
+                    extracted_final.overall_extraction_confidence = max(
+                        0.0,
+                        min(100.0, old_conf + critic_feedback.confidence_delta * 100),
+                    )
+                    logger.info(
+                        "[%s] Critic confidence adjustment: %.1f → %.1f",
+                        document_id,
+                        old_conf,
+                        extracted_final.overall_extraction_confidence,
+                    )
+
+                # Append critic concerns to rationale
+                if critic_feedback.concerns:
+                    ctx.rationale = (
+                        f"{ctx.rationale} | Critic concerns: "
+                        + "; ".join(critic_feedback.concerns)
+                    )
+            else:
+                logger.info("[%s] Critic AGREES with agent analysis.", document_id)
+
+            agent_state.final_rationale = ctx.rationale
+            agent_state.orchestrator_routing = ctx.routing_decision
+
+        except Exception as exc:
+            logger.warning("[%s] Critic agent raised unexpected error (skipped): %s", document_id, exc)
+
     logger.info(
         "[%s] Orchestrator complete: %d iterations, tools=%s, routing=%s",
         document_id,
@@ -251,8 +329,4 @@ def run_orchestrator(
     )
 
     # ── Return agent results (falling back to empty models if a tool never ran) ──
-    extracted = ctx.extracted_fields or ExtractedFields(raw_text_length=len(document_text))
-    validation = ctx.validation_result or ValidationResult()
-    remedial = ctx.remedial_result or RemedialResult()
-
-    return extracted, validation, remedial, agent_state
+    return extracted_final, validation_final, remedial_final, agent_state

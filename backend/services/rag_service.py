@@ -159,23 +159,27 @@ they are relevant to the answer.
 _FULL_TEXT_THRESHOLD_CHARS = 8_000
 
 
+
 def answer_question(
     document_id: str,
     question: str,
     document_text: str,
 ) -> AskResponse:
     """
-    RAG pipeline:
-      - Short documents (< 8k chars): send full text directly — more accurate.
-      - Long documents: chunk → retrieve top-5 → send retrieved passages.
+    RAG pipeline — vector-first with keyword fallback:
 
-    Returns the answer + cited source passages.
+    1. Embed the question using Azure AI Foundry text-embedding-3-small
+    2. Search PGVector for the top-5 semantically similar chunks
+    3. If PGVector unavailable or no results, fall back to TF-IDF keyword search
+    4. Short documents (< 8k chars): send full text directly (no retrieval)
+
+    Returns the answer + cited source passages with similarity scores.
     """
     settings = get_settings()
     client = get_llm_client()
 
     if len(document_text) <= _FULL_TEXT_THRESHOLD_CHARS:
-        # Full-text mode — no retrieval needed, send entire document
+        # Full-text mode — no retrieval needed
         context = document_text
         sources: list[CitedChunk] = [
             CitedChunk(chunk_index=0, text=document_text, relevance_score=1.0)
@@ -185,15 +189,34 @@ def answer_question(
             document_id, question, len(document_text),
         )
     else:
-        # Retrieval mode for longer documents
         chunks = chunk_document(document_text)
-        sources = retrieve_relevant_chunks(chunks, question, top_k=5)
+
+        # ── Try vector search first ───────────────────────────────────────────
+        sources = []
+        try:
+            from backend.services.embedding_service import embed_single
+            from backend.services.vector_store import search_similar_chunks
+
+            query_vec = embed_single(question)
+            sources = search_similar_chunks(document_id, query_vec, top_k=5)
+            if sources:
+                logger.info(
+                    "RAG vector search: document_id=%s question=%r top_similarity=%.3f",
+                    document_id, question, sources[0].relevance_score,
+                )
+        except Exception as exc:
+            logger.warning("Vector search failed, falling back to keyword: %s", exc)
+
+        # ── Keyword fallback if vector search returned nothing ────────────────
+        if not sources:
+            sources = retrieve_relevant_chunks(chunks, question, top_k=5)
+            logger.info(
+                "RAG keyword fallback: document_id=%s question=%r chunks=%d",
+                document_id, question, len(sources),
+            )
+
         context_parts = [f"[Passage {i+1}]\n{s.text}" for i, s in enumerate(sources)]
         context = "\n\n".join(context_parts)
-        logger.info(
-            "RAG retrieval mode: document_id=%s question=%r chunks=%d/%d",
-            document_id, question, len(sources), len(chunks),
-        )
 
     user_message = (
         f"Document text:\n\n{context}\n\n"

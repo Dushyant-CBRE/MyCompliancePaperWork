@@ -89,6 +89,28 @@ def process_document(
         # Persist text to blob so the Q&A endpoint can retrieve it later
         save_document_text(document_id, document_text)
 
+        # ── Step 2c: Embed chunks into PGVector (async-safe best-effort) ────
+        # Runs after text extraction so the RAG endpoint can answer questions
+        # with vector similarity search instead of keyword overlap.
+        try:
+            from backend.services.embedding_service import embed_texts
+            from backend.services.rag_service import chunk_document
+            from backend.services.vector_store import store_document_chunks
+
+            doc_chunks = chunk_document(document_text)
+            if doc_chunks:
+                chunk_texts = [c["text"] for c in doc_chunks]
+                embeddings = embed_texts(chunk_texts)
+                store_document_chunks(document_id, doc_chunks, embeddings)
+                logger.info(
+                    "[%s] Stored %d chunk embeddings in PGVector", document_id, len(doc_chunks)
+                )
+        except Exception as embed_exc:
+            logger.warning(
+                "[%s] Chunk embedding skipped (RAG will use keyword fallback): %s",
+                document_id, embed_exc,
+            )
+
         # ── Step 3: Agentic Orchestrator ───────────────────────────────────
         # Pass pre_extracted_fields so the orchestrator can skip Agent 1
         # when the custom analyzer already provided structured fields.
