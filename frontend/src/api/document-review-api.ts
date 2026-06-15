@@ -40,6 +40,10 @@ export function getDocumentPdfUrl(id: string): string {
 // ── Mapping helpers ──────────────────────────────────────────────────────────
 
 function deriveAiDecision(record: DocumentRecord): string {
+    // Prefer deterministic insights computed by the backend when available
+    const compliance = record.insights?.compliance_status;
+    if (compliance) return compliance;
+
     const classification = record.remedial_result?.classification;
     if (classification === 'REMEDIAL_CRITICAL') return 'Remedial Critical';
     if (classification === 'REMEDIAL_MINOR') return 'Remedial Minor';

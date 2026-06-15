@@ -15,6 +15,7 @@ class Settings(BaseSettings):
         env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # ── Anthropic (Azure-hosted Claude) ─────────────────────────────────────

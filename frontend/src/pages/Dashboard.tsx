@@ -56,7 +56,10 @@ export function Dashboard() {
         approved: rawRecords.filter(r => r.status === 'auto_approved' || r.status === 'approved').length,
         needsReview: rawRecords.filter(r => r.status === 'manual_review' || r.status === 'requires_attention' || r.status === 'pending' || r.status === 'processing').length,
         rejected: rawRecords.filter(r => r.status === 'rejected').length,
-        remedialDetected: rawRecords.filter(r => r.remedial_result?.classification === 'REMEDIAL_MINOR' || r.remedial_result?.classification === 'REMEDIAL_CRITICAL').length,
+        // Count documents where backend insights report remedial/non-compliant
+        remedialDetected: rawRecords.filter(r =>
+            (r.insights?.compliance_status === 'Remedial Action Required') || (r.insights?.compliance_status === 'Non-Compliant')
+        ).length,
     };
 
     const eligibleCount = documents.filter(d => d.confidence >= 85 && d.status !== 'Approved').length;

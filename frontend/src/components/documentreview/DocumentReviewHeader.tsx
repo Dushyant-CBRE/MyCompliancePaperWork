@@ -132,14 +132,18 @@ export function DocumentReviewHeader({ doc, id, onAskAI, onRejectClick, onStatus
             {/* RIGHT COLUMN — matches Analysis panel (w-[480px]) */}
             <div className="w-[480px] px-6 py-4 flex flex-col justify-center gap-2">
                 <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <span className={`px-3 py-1 rounded-full border text-sm ${
-                        doc.status.toLowerCase() === 'approved'
-                            ? 'bg-green-50 text-green-700 border-green-200'
-                            : doc.status.toLowerCase() === 'rejected'
-                            ? 'bg-red-50 text-red-700 border-red-200'
-                            : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                    }`}>{doc.status}</span>
-                    <span className="px-3 py-1 bg-red-50 text-red-700 rounded-full border border-red-200 text-sm">{doc.aiDecision}</span>
+                    {/* Primary badge: prefer backend insights (`aiDecision`) to avoid conflicting labels */}
+                    {
+                        (() => {
+                            const label = doc.aiDecision || doc.status;
+                            const key = (label || '').toLowerCase();
+                            let cls = 'bg-yellow-50 text-yellow-700 border-yellow-200';
+                            if (key === 'compliant' || key === 'approved') cls = 'bg-green-50 text-green-700 border-green-200';
+                            else if (key === 'non-compliant' || key === 'rejected') cls = 'bg-red-50 text-red-700 border-red-200';
+                            else if (key === 'advisory' || key === 'remedial minor' || key === 'remedial critical' || key === 'remedial action required') cls = 'bg-orange-50 text-orange-700 border-orange-200';
+                            return <span className={`px-3 py-1 rounded-full border text-sm ${cls}`}>{label}</span>;
+                        })()
+                    }
                     <span className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full border border-orange-200 text-sm">Risk: {doc.riskLevel}</span>
                 </div>
                 <div className="flex items-center gap-3 justify-end">

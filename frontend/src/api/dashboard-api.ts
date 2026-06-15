@@ -51,11 +51,14 @@ export function mapDocumentRecord(record: DocumentRecord): Document {
     if (record.insights?.flags && record.insights.flags.length > 0) {
         flags = record.insights.flags;
     } else {
-        if (record.validation_result?.issues) {
-            flags = [...record.validation_result.issues];
-        }
+        // If no pre-computed insights flags, derive only from remedial findings
+        // and completeness/operational signals. Do NOT surface raw validation
+        // issues here to avoid cluttering the dashboard with metadata checks.
         if (rem?.classification === 'REMEDIAL_CRITICAL') flags.push('Remedial Critical');
         else if (rem?.classification === 'REMEDIAL_MINOR') flags.push('Remedial Minor');
+        if (record.extracted_fields && record.extracted_fields.overall_extraction_confidence && record.extracted_fields.overall_extraction_confidence < 70) {
+            flags.push('Low extraction confidence');
+        }
     }
 
     return {
@@ -68,9 +71,8 @@ export function mapDocumentRecord(record: DocumentRecord): Document {
         status,
         confidence: Math.round(record.confidence_score?.overall_score ?? 0),
         flags,
-        remedial:
-            rem?.classification === 'REMEDIAL_MINOR' ||
-            rem?.classification === 'REMEDIAL_CRITICAL',
+        // Use backend insights.compliance_status as the authoritative source
+        remedial: (record.insights?.compliance_status === 'Remedial Action Required') || (record.insights?.compliance_status === 'Non-Compliant'),
         complianceStatus: record.insights?.compliance_status ?? null,
         riskLevel: record.insights?.risk_level ?? null,
     };

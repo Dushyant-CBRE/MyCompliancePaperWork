@@ -53,7 +53,7 @@ export function AnalysisPanel({
             <div className="flex-1 overflow-auto p-6">
                 {activeTab === 'fields' && <ExtractedFieldsTab fields={fields} />}
                 {activeTab === 'validation' && <ValidationChecksTab checks={checks} />}
-                {activeTab === 'remedial' && <RemedialDetectionTab evidence={evidence} />}
+                {activeTab === 'remedial' && <RemedialDetectionTab evidence={evidence} validationChecks={checks} />}
                 {activeTab === 'audit' && auditData && <AuditReasoningTab data={auditData} />}
             </div>
         </div>

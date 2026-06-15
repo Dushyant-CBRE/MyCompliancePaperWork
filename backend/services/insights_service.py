@@ -49,12 +49,21 @@ def _risk_level(remedial: RemedialResult, overall_score: float) -> str:
 
 
 def _compliance_status(remedial: RemedialResult, validation: ValidationResult) -> str:
-    if remedial.classification == RemedialClassification.REMEDIAL_CRITICAL:
+    # Simplified policy: compliance is determined by remedial findings, but only
+    # when there is actual supporting evidence/items. If the remedial agent
+    # returned a classification but provided no findings/evidence, treat as
+    # Compliant to avoid false-positive UI labels.
+    has_evidence = bool(
+        (remedial.evidence and len(remedial.evidence) > 0)
+        or (remedial.critical_items and len(remedial.critical_items) > 0)
+        or (remedial.minor_items and len(remedial.minor_items) > 0)
+        or (remedial.findings and len(remedial.findings) > 0)
+    )
+
+    if remedial.classification == RemedialClassification.REMEDIAL_CRITICAL and has_evidence:
         return "Non-Compliant"
-    if remedial.classification == RemedialClassification.REMEDIAL_MINOR:
-        return "Advisory"
-    if validation.issues:
-        return "Advisory"
+    if remedial.classification == RemedialClassification.REMEDIAL_MINOR and has_evidence:
+        return "Remedial Action Required"
     return "Compliant"
 
 
@@ -94,8 +103,7 @@ def generate_insights(
     # ── Flags ────────────────────────────────────────────────────────────────
     flags: list[str] = []
 
-    if not validation.date_valid:
-        flags.append("Inspection date invalid or in the future")
+    # Flags: focus on remedial findings and operational flags (completeness/overdue).
     if is_overdue:
         flags.append(f"Next service overdue by {abs(days_until_next)} days")
     elif days_until_next is not None and days_until_next <= 30:
@@ -106,11 +114,10 @@ def generate_insights(
         flags.append(f"{len(remedial.minor_items)} minor finding(s)")
     if completeness < 70:
         flags.append(f"Only {completeness}% of expected fields found")
-    if validation.site_name_match < 70:
-        flags.append("Site name mismatch with expected value")
-    if validation.ppm_reference_match < 70:
-        flags.append("PPM reference mismatch with expected value")
-    flags.extend(validation.issues)
+    # NOTE: validation.issues are intentionally NOT surfaced here — validation
+    # checks are useful for routing but should not dominate the high-level
+    # insights or the UI flags. This keeps the officer focused on document
+    # content and key_readings from Content Understanding.
 
     # ── Score breakdown (for frontend charts) ────────────────────────────────
     score_breakdown = [

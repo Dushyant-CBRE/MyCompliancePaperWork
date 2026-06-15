@@ -71,11 +71,22 @@ function mapDocumentRecord(record: DocumentRecord): ReviewDocumentDetail {
         detail: c.detail || undefined,
     })) ?? [];
 
-    const evidence: RemedialEvidence[] = rem?.evidence?.map((e) => ({
-        text: e.text,
-        page: e.page,
-        severity: e.severity,
-    })) ?? [];
+    // If the remedial_result provided structured evidence, use it. If not,
+    // fall back to building evidence from critical_items / minor_items so the
+    // UI shows the same advisory items the header/insights reflect.
+    let evidence: RemedialEvidence[] = [];
+    if (rem) {
+        if (rem.evidence && rem.evidence.length > 0) {
+            evidence = rem.evidence.map((e) => ({ text: e.text, page: e.page, severity: e.severity }));
+        } else {
+            if (rem.critical_items && rem.critical_items.length > 0) {
+                evidence.push(...rem.critical_items.map((t) => ({ text: t, page: 0, severity: 'High' })));
+            }
+            if (rem.minor_items && rem.minor_items.length > 0) {
+                evidence.push(...rem.minor_items.map((t) => ({ text: t, page: 0, severity: 'Medium' })));
+            }
+        }
+    }
 
     return { doc, fields, checks, evidence, blobUrl: record.blob_url ?? null };
 }

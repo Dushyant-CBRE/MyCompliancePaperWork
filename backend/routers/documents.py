@@ -54,6 +54,17 @@ def get_document_detail(document_id: str):
     record = get_document(document_id)
     if record is None:
         raise HTTPException(status_code=404, detail=f"Document '{document_id}' not found.")
+    # Log key diagnostic fields so the operator can paste terminal logs for debugging
+    try:
+        logger.info("[DEBUG-DOC] document_id=%s insights=%s remedial=%s confidence=%s validation_issues=%s",
+                    document_id,
+                    record.insights.model_dump_json() if record.insights else "null",
+                    record.remedial_result.model_dump_json() if record.remedial_result else "null",
+                    record.confidence_score.model_dump_json() if record.confidence_score else "null",
+                    (record.validation_result.issues if record.validation_result else []),
+        )
+    except Exception:
+        logger.exception("Failed to log diagnostic fields for document %s", document_id)
     return record
 
 

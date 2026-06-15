@@ -255,7 +255,11 @@ def tool_validate_document(ctx: OrchestratorContext, args: dict) -> str:
 def tool_detect_remedial_issues(ctx: OrchestratorContext, args: dict) -> str:
     """Run the remedial-detection agent on the full document text."""
     logger.info("Tool: detect_remedial_issues")
-    ctx.remedial_result = run_remedial_detection_agent(ctx.document_text)
+    # Pass current extracted fields so the remedial agent can deterministically
+    # evaluate key readings and other structured evidence before calling the LLM.
+    ctx.remedial_result = run_remedial_detection_agent(
+        ctx.document_text, extracted=ctx.extracted_fields
+    )
     rr = ctx.remedial_result
     summary = {
         "classification": rr.classification,

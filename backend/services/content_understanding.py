@@ -215,6 +215,12 @@ def extract_with_custom_analyzer(pdf_bytes: bytes) -> Optional[ExtractedFields]:
                 getattr(contents[0], "confidence", None)
             ) or 70.0,
         )
+        # Log raw CU output for debugging (includes fields/key_readings)
+        try:
+            raw_contents = contents[0].as_dict() if hasattr(contents[0], "as_dict") else str(contents[0])
+            logger.info("[CU-RAW] analyzer=%s result=%s", analyzer, raw_contents)
+        except Exception:
+            logger.exception("Failed to log CU raw contents for analyzer=%s", analyzer)
 
         logger.info(
             "Custom analyzer extracted %d fields (overall confidence %.1f%%)",
@@ -274,6 +280,13 @@ def extract_text_with_prebuilt(pdf_bytes: bytes) -> Optional[str]:
                     lines.append(f"{k}: {val}")
 
         full_text = "\n".join(lines)
+        # Log CU prebuilt output summary and detected fields for debugging
+        try:
+            summary_fields = {k: _safe_str(v) or _safe_date(v) or None for k, v in fields.items()} if fields else {}
+            logger.info("[CU-PREBUILT] markdown_len=%d kv_pairs=%d fields=%s", len(markdown or ""), len(fields), summary_fields)
+        except Exception:
+            logger.exception("Failed to log CU prebuilt summary")
+
         logger.info(
             "Prebuilt analyzer extracted %d chars, %d KV pairs",
             len(full_text),

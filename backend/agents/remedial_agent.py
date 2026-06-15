@@ -83,12 +83,16 @@ Rules:
 """
 
 
-def _call_llm(model_deployment: str, document_text: str) -> dict:
+def _call_llm(model_deployment: str, document_text: str, evidence_block: dict | None = None) -> dict:
     client = get_llm_client()
     user_content = (
         "Analyse the following PPM compliance document and classify it:\n\n"
         f"---BEGIN DOCUMENT---\n{document_text}\n---END DOCUMENT---"
     )
+    if evidence_block:
+        # Append structured evidence JSON to the user content to help the LLM
+        user_content += "\n\nStructured evidence:\n" + json.dumps(evidence_block, default=str)
+
     response = client.chat.completions.create(
         model=model_deployment,
         messages=[
@@ -98,10 +102,11 @@ def _call_llm(model_deployment: str, document_text: str) -> dict:
         temperature=0.0,
     )
     raw_json = response.choices[0].message.content or "{}"
+    logger.debug("Remedial LLM raw response: %s", raw_json)
     return _parse_json(raw_json)
 
 
-def run_remedial_detection_agent(document_text: str) -> RemedialResult:
+def run_remedial_detection_agent(document_text: str, extracted: object | None = None) -> RemedialResult:
     """
     Run Agent 3 against the full document text.
     Escalates to the fallback model if primary confidence is below threshold.
@@ -115,8 +120,115 @@ def run_remedial_detection_agent(document_text: str) -> RemedialResult:
         settings.azure_openai_deployment_primary,
     )
 
+    # Deterministic checks using structured extracted fields (if provided)
+    # Priority: if key_readings indicate out-of-range or flagged values, mark REMEDIAL_CRITICAL.
     try:
-        data = _call_llm(settings.azure_openai_deployment_primary, document_text)
+        key_readings = []
+        if extracted is not None and hasattr(extracted, "key_readings"):
+            key_readings = getattr(extracted, "key_readings") or []
+
+        # Example deterministic rules applied to key_readings:
+        # - If any reading name contains 'CO' or 'carbon monoxide' and value > threshold -> CRITICAL
+        # - If any reading status contains 'fail' or 'out of range' -> CRITICAL
+        critical_indicators = []
+        minor_indicators = []
+        for r in key_readings:
+            name = (r.get("name") or "").lower()
+            val_str = str(r.get("value") or "").replace("ppm", "").strip()
+            status = (r.get("status") or "").lower()
+            # Status-based rules
+            if "fail" in status or "out of range" in status or "critical" in status:
+                critical_indicators.append(f"{r.get('name')}: status={r.get('status')}")
+                continue
+            # Do not treat generic 'warn'/'advisory' statuses on temperature readings
+            # as remedial by default. Temperature measurements are often informational
+            # and should only be escalated when explicitly marked as fail/out-of-range.
+            if ("warn" in status or "advisory" in status) and not ("temp" in name or "temperature" in name):
+                minor_indicators.append(f"{r.get('name')}: status={r.get('status')}")
+
+            # Numeric threshold rules (best-effort parse)
+            try:
+                val = float(re.sub(r"[^0-9.\-]", "", val_str)) if val_str else None
+            except Exception:
+                val = None
+
+            if val is not None:
+                # Example thresholds (domain-specific values may be adjusted):
+                # CO (ppm) > 50 -> CRITICAL; 10-50 -> MINOR
+                if "co" in name or "carbon monoxide" in name:
+                    if val > 50:
+                        critical_indicators.append(f"{r.get('name')}: {val}")
+                    elif val >= 10:
+                        minor_indicators.append(f"{r.get('name')}: {val}")
+
+        # If deterministic criticals found, return CRITICAL immediately
+        if critical_indicators:
+            logger.info("Remedial deterministic: critical indicators found: %s", critical_indicators)
+            return RemedialResult(
+                classification=RemedialClassification.REMEDIAL_CRITICAL,
+                classification_confidence=98.0,
+                findings=critical_indicators,
+                critical_items=critical_indicators,
+                minor_items=minor_indicators,
+                reasoning="Deterministic rule matched critical key readings.",
+            )
+
+        # If no criticals but some minor indicators, return REMEDIAL_MINOR deterministically
+        # If the document's extracted overall outcome indicates a clear 'Good' / 'Satisfactory' completion,
+        # treat as PASS when there are no deterministic critical indicators. This lets clearly completed
+        # works with only documentation/minor advisory notes be marked compliant.
+        try:
+            overall_outcome = None
+            if extracted is not None and hasattr(extracted, "overall_outcome"):
+                overall_outcome = getattr(extracted, "overall_outcome")
+            if overall_outcome:
+                o = str(overall_outcome).lower()
+                if any(k in o for k in ("good", "satisfactory", "pass", "complete", "completed")):
+                    logger.info("Remedial deterministic: overall_outcome=%s suggests PASS; returning PASS", overall_outcome)
+                    return RemedialResult(
+                        classification=RemedialClassification.PASS,
+                        classification_confidence=92.0,
+                        findings=[f"Overall outcome: {overall_outcome}"],
+                        critical_items=[],
+                        minor_items=[],
+                        reasoning="Document completion survey rated Good/Satisfactory and no critical key readings; treated as PASS.",
+                    )
+        except Exception:
+            logger.exception("Failed to evaluate overall_outcome for deterministic PASS")
+
+        if minor_indicators:
+            logger.info("Remedial deterministic: minor indicators found: %s", minor_indicators)
+            return RemedialResult(
+                classification=RemedialClassification.REMEDIAL_MINOR,
+                classification_confidence=85.0,
+                findings=minor_indicators,
+                critical_items=[],
+                minor_items=minor_indicators,
+                reasoning="Deterministic rule matched minor key readings.",
+            )
+    except Exception as exc:
+        logger.exception("Remedial deterministic check failed: %s", exc)
+
+    try:
+        # Build evidence block to send to LLM when deterministic checks don't decide
+        evidence_block = None
+        try:
+            if extracted is not None:
+                evidence_block = {
+                    "extracted_fields_summary": {
+                        "overall_extraction_confidence": getattr(extracted, "overall_extraction_confidence", None),
+                        "site_name": getattr(extracted, "site_name", None),
+                        "ppm_reference": getattr(extracted, "ppm_reference", None),
+                        "inspection_date": getattr(extracted, "inspection_date", None),
+                        "inspector_name": getattr(extracted, "inspector_name", None),
+                        "document_type": getattr(extracted, "document_type", None),
+                    },
+                    "key_readings": getattr(extracted, "key_readings", []),
+                }
+        except Exception:
+            evidence_block = None
+
+        data = _call_llm(settings.azure_openai_deployment_primary, document_text, evidence_block=evidence_block)
         confidence = float(data.get("classification_confidence", 0))
 
         # Escalate to fallback model if confidence is too low
