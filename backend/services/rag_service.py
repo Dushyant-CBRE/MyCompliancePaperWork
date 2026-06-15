@@ -202,7 +202,7 @@ def answer_question(
 
     try:
         response = client.chat.completions.create(
-            model=settings.azure_openai_deployment_primary,
+            model=settings.azure_openai_deployment_id,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": user_message},

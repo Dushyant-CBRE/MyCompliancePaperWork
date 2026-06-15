@@ -100,7 +100,7 @@ def run_validation_agent(
 
     try:
         response = client.chat.completions.create(
-            model=settings.azure_openai_deployment_primary,
+            model=settings.azure_openai_deployment_id,
             messages=[
                 {"role": "system", "content": _build_system_prompt()},
                 {"role": "user", "content": user_content},

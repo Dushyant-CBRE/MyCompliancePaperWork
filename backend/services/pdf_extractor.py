@@ -1,11 +1,11 @@
 """
-PDF Extractor Service
----------------------
+PDF Extractor Service - LLM-Based OCR
+──────────────────────────────────────
 Strategy:
 1. Use PyMuPDF (fitz) to extract embedded text from a PDF.
 2. If the page text is too short (likely a scanned/image-only PDF),
-   convert the page to a PNG image and send it to GPT-4o Vision to
-   transcribe the content – effectively replacing Azure Document Intelligence.
+   convert the page to a PNG image and send it to Azure OpenAI Vision to
+   transcribe the content – effectively replacing Document Intelligence.
 3. Returns a single combined string of the full document text.
 """
 from __future__ import annotations
@@ -41,7 +41,7 @@ def _pdf_bytes_to_base64_images(pdf_bytes: bytes, dpi: int = 150) -> list[str]:
 
 def _extract_text_with_vision(base64_images: list[str]) -> str:
     """
-    Send PDF page images to GPT-4o Vision and request a full text transcription.
+    Send PDF page images to Azure OpenAI Vision and request a full text transcription.
     This replaces Azure Document Intelligence for scanned documents.
     """
     settings = get_settings()
@@ -61,16 +61,14 @@ def _extract_text_with_vision(base64_images: list[str]) -> str:
     ]
     for img_b64 in base64_images:
         content.append({
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": "image/png",
-                "data": img_b64,
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/png;base64,{img_b64}",
             },
         })
 
     response = client.chat.completions.create(
-        model=settings.azure_openai_deployment_primary,
+        model="gpt-4-vision",  # Model name (deployment ID used instead)
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": content},
@@ -82,37 +80,24 @@ def _extract_text_with_vision(base64_images: list[str]) -> str:
 
 def extract_text_from_pdf(pdf_bytes: bytes) -> tuple[str, str]:
     """
-    Main entry point.  Returns (text, extraction_method).
+    Main entry point. Returns (text, extraction_method).
 
     Fallback chain:
-      1. Content Understanding prebuilt-documentAnalysis  (best OCR + KV pairs + tables)
-      2. PyMuPDF embedded text extraction                 (fast, works on digital PDFs)
-      3. Claude Vision                                    (last resort for scanned pages)
+      1. PyMuPDF embedded text extraction  (fast, works on digital PDFs)
+      2. Azure OpenAI Vision              (for scanned pages)
     """
-    # ── Level 1: Content Understanding prebuilt ──────────────────────────────
-    try:
-        from backend.services.content_understanding import extract_text_with_prebuilt
-        cu_text = extract_text_with_prebuilt(pdf_bytes)
-        if cu_text and len(cu_text) > MIN_TEXT_CHARS_PER_PAGE:
-            logger.info(
-                "PDF text extracted via Content Understanding prebuilt (%d chars)",
-                len(cu_text),
-            )
-            return cu_text, "CU Prebuilt"
-    except Exception as exc:
-        logger.warning("Content Understanding prebuilt step raised: %s", exc)
-
-    # ── Level 2: PyMuPDF embedded text ────────────────────────────────────────
+    # ── Level 1: PyMuPDF embedded text ────────────────────────────────────────
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         pages_text: list[str] = []
         has_sparse_pages = False
 
-        for page in doc:
+        for page_idx, page in enumerate(doc):
             text = page.get_text("text").strip()
             pages_text.append(text)
             if len(text) < MIN_TEXT_CHARS_PER_PAGE:
                 has_sparse_pages = True
+                logger.debug(f"Page {page_idx + 1} has sparse text ({len(text)} chars)")
 
         doc.close()
 
@@ -125,17 +110,19 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> tuple[str, str]:
             )
             return full_text, "PyMuPDF"
 
-        # ── Level 3: Claude Vision for scanned pages ─────────────────────────
-        logger.info("Sparse text detected — switching to Claude Vision extraction")
+        # ── Level 2: Azure OpenAI Vision for scanned pages ──────────────────
+        logger.info("Sparse text detected — switching to Azure OpenAI Vision extraction")
         images = _pdf_bytes_to_base64_images(pdf_bytes)
         vision_text = _extract_text_with_vision(images)
         logger.info(
-            "Claude Vision extracted %d chars from %d page images",
+            "Azure OpenAI Vision extracted %d chars from %d page images",
             len(vision_text),
             len(images),
         )
-        return vision_text, "Claude Vision"
+        return vision_text, "Azure OpenAI Vision"
 
     except Exception as exc:
         logger.exception("PDF extraction failed: %s", exc)
+        raise
+
         raise

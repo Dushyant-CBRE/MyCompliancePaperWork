@@ -1,15 +1,8 @@
 """
-LLM client using Anthropic Claude via Azure AI Foundry.
+LLM client using Azure OpenAI via WSO2 OAuth2 Proxy.
 
-Wraps AnthropicFoundry to expose the same interface the agents use:
-    client.chat.completions.create(model, messages, tools, tool_choice, temperature)
-
-Anthropic differences handled here transparently:
-  - system message extracted from messages list and passed separately
-  - tool schemas converted from OpenAI function-calling format → Anthropic tool format
-  - tool_choice mapped (auto → auto, required → any)
-  - response wrapped in the same SimpleNamespace shape agents already consume
-  - tool_calls on responses converted to the same SimpleNamespace shape
+Authenticates via WSO2 (client credentials flow) and uses the resulting token
+to make Azure OpenAI API calls through the corporate proxy.
 """
 from __future__ import annotations
 
@@ -26,194 +19,197 @@ from backend.config import get_settings
 logger = logging.getLogger(__name__)
 
 
-def _openai_tools_to_anthropic(tools: list[dict]) -> list[dict]:
-    """Convert OpenAI function-calling schema → Anthropic tools format."""
-    result = []
-    for t in tools:
-        fn = t.get("function", {})
-        result.append({
-            "name": fn["name"],
-            "description": fn.get("description", ""),
-            "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
-        })
-    return result
-
-
-def _map_tool_choice(tool_choice) -> dict:
-    if tool_choice == "required" or tool_choice == "any":
-        return {"type": "any"}
-    if isinstance(tool_choice, dict) and "function" in tool_choice:
-        return {"type": "tool", "name": tool_choice["function"]["name"]}
-    return {"type": "auto"}
-
-
-def _wrap_response(response) -> SimpleNamespace:
+class AzureOpenAIClient:
     """
-    Wrap an Anthropic Message into the OpenAI-compatible SimpleNamespace
-    that all agents expect:
-      result.choices[0].message.content    → str | None
-      result.choices[0].message.tool_calls → list[SimpleNamespace] | None
-      result.choices[0].finish_reason      → str
+    Azure OpenAI client that authenticates via WSO2 OAuth2 proxy.
+    
+    Flow:
+    1. Exchange CLIENT_ID + CLIENT_SECRET with WSO2 for access token
+    2. Use token to make Azure OpenAI API calls through WSO2 proxy
     """
-    text_content = ""
-    tool_calls = []
 
-    for block in response.content:
-        if block.type == "text":
-            text_content += block.text
-        elif block.type == "tool_use":
-            tool_calls.append(
-                SimpleNamespace(
-                    id=block.id,
-                    type="function",
-                    function=SimpleNamespace(
-                        name=block.name,
-                        arguments=json.dumps(block.input),
-                    ),
-                )
+    def __init__(self) -> None:
+        settings = get_settings()
+        
+        if not settings.azure_openai_endpoint:
+            raise ValueError("AZURE_OPENAI_ENDPOINT not configured")
+        if not settings.wso2_client_id or not settings.wso2_client_secret:
+            raise ValueError("WSO2_CLIENT_ID or WSO2_CLIENT_SECRET not configured")
+        if not settings.azure_openai_deployment_id:
+            raise ValueError("AZURE_OPENAI_DEPLOYMENT_ID not configured")
+
+        self._endpoint = settings.azure_openai_endpoint.rstrip("/")
+        self._deployment_id = settings.azure_openai_deployment_id
+        self._api_version = settings.azure_openai_api_version
+        self._max_retries = settings.llm_max_retries
+        
+        # WSO2 OAuth2 settings
+        self._wso2_auth_url = settings.wso2_auth_url
+        self._wso2_client_id = settings.wso2_client_id
+        self._wso2_client_secret = settings.wso2_client_secret
+        
+        # Token cache
+        self._access_token: str | None = None
+        self._token_expires_at: float = 0.0
+
+        self.chat = _ChatResource(_ChatCompletions(
+            self._endpoint,
+            self._deployment_id,
+            self._api_version,
+            self._max_retries,
+            self._get_access_token,
+        ))
+
+    def _get_access_token(self) -> str:
+        """
+        Get a valid access token from WSO2, using cached token if not expired.
+        """
+        now = time.time()
+        
+        # Return cached token if still valid (with 30s buffer)
+        if self._access_token and now < (self._token_expires_at - 30):
+            return self._access_token
+
+        # Request new token from WSO2
+        logger.info("Requesting new access token from WSO2")
+        
+        try:
+            response = httpx.post(
+                self._wso2_auth_url,
+                auth=(self._wso2_client_id, self._wso2_client_secret),
+                data={"grant_type": "client_credentials"},
+                verify=False,  # Required for corporate SSL
             )
+            response.raise_for_status()
+        except Exception as exc:
+            logger.error(f"WSO2 token request failed: {exc}")
+            raise
 
-    finish_reason = "stop" if response.stop_reason == "end_turn" else response.stop_reason
-    message = SimpleNamespace(
-        content=text_content or None,
-        role="assistant",
-        tool_calls=tool_calls if tool_calls else None,
-    )
-    return SimpleNamespace(
-        choices=[SimpleNamespace(message=message, finish_reason=finish_reason)],
-        model=response.model,
-    )
+        data = response.json()
+        self._access_token = data.get("access_token")
+        expires_in = data.get("expires_in", 3600)
+        self._token_expires_at = now + expires_in
+
+        logger.debug(f"Got new token, expires in {expires_in}s")
+        return self._access_token
 
 
 class _ChatCompletions:
-    """Anthropic-backed chat.completions.create() compatible with the OpenAI SDK interface."""
+    """Chat completions wrapper that uses WSO2-authenticated Azure OpenAI calls."""
 
-    def __init__(self, client) -> None:
-        self._client = client
+    def __init__(self, endpoint: str, deployment_id: str, api_version: str, max_retries: int, get_token_fn) -> None:
+        self._endpoint = endpoint
+        self._deployment_id = deployment_id
+        self._api_version = api_version
+        self._max_retries = max_retries
+        self._get_token_fn = get_token_fn
 
     def create(self, model: str, messages: list[dict], **kwargs) -> SimpleNamespace:
-        # ── Split system message out (Anthropic takes it separately) ────────
-        system = ""
-        filtered: list[dict] = []
-        for m in messages:
-            if m["role"] == "system":
-                system += m["content"]
-            else:
-                filtered.append(m)
+        """
+        Create a chat completion using Azure OpenAI via WSO2 proxy.
 
-        # ── Convert messages to Anthropic format ───────────────────────────
-        anthropic_msgs: list[dict] = []
-        for m in filtered:
-            role = m["role"]
+        Parameters:
+            model: Model name (ignored, deployment_id used instead)
+            messages: List of message dicts with role and content
+            **kwargs: Additional parameters (temperature, tools, tool_choice, etc.)
 
-            if role == "assistant":
-                blocks = []
-                if m.get("content"):
-                    blocks.append({"type": "text", "text": m["content"]})
-                for tc in (m.get("tool_calls") or []):
-                    try:
-                        inp = json.loads(tc["function"]["arguments"] or "{}")
-                    except (json.JSONDecodeError, KeyError):
-                        inp = {}
-                    blocks.append({
-                        "type": "tool_use",
-                        "id": tc["id"],
-                        "name": tc["function"]["name"],
-                        "input": inp,
-                    })
-                if blocks:
-                    anthropic_msgs.append({"role": "assistant", "content": blocks})
+        Returns:
+            SimpleNamespace with standard completion response structure
+        """
+        # Build the URL for Azure OpenAI (via WSO2 proxy)
+        url = (
+            f"{self._endpoint}/openai/deployments/{self._deployment_id}/"
+            f"chat/completions?api-version={self._api_version}"
+        )
 
-            elif role == "tool":
-                # OpenAI tool result → Anthropic tool_result block in a user turn
-                anthropic_msgs.append({
-                    "role": "user",
-                    "content": [{
-                        "type": "tool_result",
-                        "tool_use_id": m.get("tool_call_id", ""),
-                        "content": str(m.get("content", "")),
-                    }],
-                })
-
-            else:
-                # Convert content: if it's a list, translate OpenAI image_url
-                # blocks to Anthropic's native image format.
-                raw_content = m["content"]
-                if isinstance(raw_content, list):
-                    converted: list[dict] = []
-                    for block in raw_content:
-                        if block.get("type") == "image_url":
-                            url: str = block["image_url"]["url"]
-                            if url.startswith("data:"):
-                                # data:image/png;base64,<data>
-                                header, data = url.split(",", 1)
-                                media_type = header.split(":")[1].split(";")[0]
-                                converted.append({
-                                    "type": "image",
-                                    "source": {
-                                        "type": "base64",
-                                        "media_type": media_type,
-                                        "data": data,
-                                    },
-                                })
-                            else:
-                                converted.append({
-                                    "type": "image",
-                                    "source": {"type": "url", "url": url},
-                                })
-                        else:
-                            converted.append(block)
-                    anthropic_msgs.append({"role": role, "content": converted})
-                else:
-                    anthropic_msgs.append({"role": role, "content": raw_content})
-
-        # ── Build call kwargs ─────────────────────────────────────────────
-        call_kwargs: dict = {
-            "model": model,
+        # Prepare request body
+        body = {
+            "messages": messages,
+            "temperature": kwargs.get("temperature", 0.2),
             "max_tokens": kwargs.get("max_completion_tokens", 4096),
-            "messages": anthropic_msgs,
         }
-        if system:
-            call_kwargs["system"] = system
 
-        tools_raw = kwargs.get("tools")
-        if tools_raw:
-            call_kwargs["tools"] = _openai_tools_to_anthropic(tools_raw)
-            call_kwargs["tool_choice"] = _map_tool_choice(kwargs.get("tool_choice", "auto"))
+        # Add tools if provided
+        if kwargs.get("tools"):
+            body["tools"] = kwargs["tools"]
+            if kwargs.get("tool_choice"):
+                body["tool_choice"] = kwargs["tool_choice"]
 
-        temp = kwargs.get("temperature", 1.0)
-        call_kwargs["temperature"] = max(0.0, min(1.0, float(temp)))
-
-        # ── Retry on 529 Overloaded with exponential backoff ─────────────
-        max_retries = 4
-        base_delay = 5.0   # seconds
+        # Retry logic for rate limits and transient errors
         last_exc: Exception | None = None
-
-        for attempt in range(max_retries):
+        for attempt in range(self._max_retries):
             try:
-                response = self._client.messages.create(**call_kwargs)
-                return _wrap_response(response)
+                access_token = self._get_token_fn()
+                
+                response = httpx.post(
+                    url,
+                    json=body,
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Content-Type": "application/json",
+                    },
+                    verify=False,  # Required for corporate SSL
+                    timeout=60.0,
+                )
+                response.raise_for_status()
+                
+                return self._wrap_response(response.json())
+            
             except Exception as exc:
-                # Detect overloaded (529) or rate-limit (429) responses
-                is_retryable = False
                 exc_str = str(exc)
-                if "529" in exc_str or "overloaded" in exc_str.lower():
-                    is_retryable = True
-                elif "429" in exc_str or "rate" in exc_str.lower():
-                    is_retryable = True
+                # Check if error is retryable
+                is_retryable = (
+                    "429" in exc_str or "rate_limit" in exc_str.lower() or
+                    "503" in exc_str or "overloaded" in exc_str.lower() or
+                    "timeout" in exc_str.lower()
+                )
 
-                if is_retryable and attempt < max_retries - 1:
-                    delay = base_delay * (2 ** attempt)   # 5s, 10s, 20s
+                if is_retryable and attempt < self._max_retries - 1:
+                    delay = 2 ** attempt  # 1s, 2s, 4s
                     logger.warning(
-                        "Claude API overloaded (attempt %d/%d) – retrying in %.0fs: %s",
-                        attempt + 1, max_retries, delay, exc,
+                        f"Retryable error (attempt {attempt + 1}/{self._max_retries}) – "
+                        f"retrying in {delay}s: {exc}"
                     )
                     time.sleep(delay)
                     last_exc = exc
                 else:
                     raise
 
-        raise last_exc  # unreachable but satisfies type checkers
+        raise last_exc
+
+    @staticmethod
+    def _wrap_response(data: dict) -> SimpleNamespace:
+        """Wrap Azure OpenAI response into standard SimpleNamespace format."""
+        choice = data["choices"][0]
+        message = choice["message"]
+
+        tool_calls = None
+        if "tool_calls" in message and message["tool_calls"]:
+            tool_calls = [
+                SimpleNamespace(
+                    id=tc["id"],
+                    type="function",
+                    function=SimpleNamespace(
+                        name=tc["function"]["name"],
+                        arguments=tc["function"]["arguments"],
+                    ),
+                )
+                for tc in message["tool_calls"]
+            ]
+
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=message.get("content"),
+                        role=message["role"],
+                        tool_calls=tool_calls,
+                    ),
+                    finish_reason=choice["finish_reason"],
+                )
+            ],
+            model=data.get("model", "unknown"),
+        )
 
 
 class _ChatResource:
@@ -221,26 +217,7 @@ class _ChatResource:
         self.completions = completions
 
 
-class AnthropicFoundryClient:
-    """Drop-in replacement for the old CBREProxyClient, backed by AnthropicFoundry."""
-
-    def __init__(self) -> None:
-        settings = get_settings()
-        try:
-            from anthropic import AnthropicFoundry  # type: ignore
-        except ImportError as exc:
-            raise ImportError(
-                "anthropic package not installed. Run: pip install anthropic"
-            ) from exc
-
-        raw_client = AnthropicFoundry(
-            api_key=settings.anthropic_api_key,
-            base_url=settings.anthropic_endpoint,
-            http_client=httpx.Client(verify=False),
-        )
-        self.chat = _ChatResource(_ChatCompletions(raw_client))
-
-
 @lru_cache(maxsize=1)
-def get_llm_client() -> AnthropicFoundryClient:
-    return AnthropicFoundryClient()
+def get_llm_client() -> AzureOpenAIClient:
+    """Get or create the Azure OpenAI client authenticated via WSO2 (cached singleton)."""
+    return AzureOpenAIClient()

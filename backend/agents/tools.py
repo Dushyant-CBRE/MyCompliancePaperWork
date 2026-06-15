@@ -203,7 +203,7 @@ def tool_re_extract_field(ctx: OrchestratorContext, args: dict) -> str:
 
     try:
         response = client.chat.completions.create(
-            model=settings.azure_openai_deployment_primary,
+            model=settings.azure_openai_deployment_id,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
         )

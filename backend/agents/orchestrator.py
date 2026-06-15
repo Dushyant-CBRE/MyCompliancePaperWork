@@ -76,17 +76,15 @@ def run_orchestrator(
     document_text: str,
     metadata: Optional[DocumentMetadata] = None,
     document_id: str = "unknown",
-    pre_extracted_fields: Optional[ExtractedFields] = None,
 ) -> tuple[ExtractedFields, ValidationResult, RemedialResult, AgentState]:
     """
     Run the agentic orchestration loop for one document.
 
     Parameters
     ----------
-    pre_extracted_fields : If provided (from Content Understanding custom analyzer),
-                           Agent 1 (extract_all_fields) is skipped and these fields
-                           are injected directly into the orchestrator context so the
-                           loop starts from validation.
+    document_text : Raw text extracted from the PDF (by pdf_extractor)
+    metadata : Optional officer-supplied metadata for validation cross-check
+    document_id : Unique document identifier for logging
 
     Returns
     -------
@@ -98,16 +96,6 @@ def run_orchestrator(
     client = get_llm_client()
 
     ctx = OrchestratorContext(document_text=document_text, metadata=metadata)
-
-    # ── Inject pre-extracted fields from Content Understanding ───────────────
-    if pre_extracted_fields is not None:
-        ctx.extracted_fields = pre_extracted_fields
-        logger.info(
-            "[%s] Skipping Agent 1 — using Content Understanding fields "
-            "(overall confidence %.1f%%)",
-            document_id,
-            pre_extracted_fields.overall_extraction_confidence,
-        )
 
     # ── Build initial user message ────────────────────────────────────────────
     metadata_str = "None provided."
@@ -122,16 +110,6 @@ def run_orchestrator(
     # Truncate document preview for the system message (full text goes to tools)
     doc_preview = document_text[:800] + ("…[truncated]" if len(document_text) > 800 else "")
 
-    # Tell the orchestrator what to start with
-    if pre_extracted_fields is not None:
-        first_instruction = (
-            "Fields have already been extracted by Azure AI Content Understanding "
-            f"with overall confidence {pre_extracted_fields.overall_extraction_confidence:.0f}%. "
-            "Skip extract_all_fields and begin with validate_document."
-        )
-    else:
-        first_instruction = "Begin by calling extract_all_fields."
-
     messages: list[dict] = [
         {"role": "system", "content": _SYSTEM_PROMPT},
         {
@@ -140,7 +118,7 @@ def run_orchestrator(
                 f"Process the following compliance document.\n\n"
                 f"Expected metadata: {metadata_str}\n\n"
                 f"Document preview (first 800 chars):\n{doc_preview}\n\n"
-                f"{first_instruction}"
+                f"Begin by calling extract_all_fields."
             ),
         },
     ]
@@ -154,7 +132,7 @@ def run_orchestrator(
         logger.info("[%s] Orchestrator iteration %d", document_id, iteration)
 
         response = client.chat.completions.create(
-            model=settings.azure_openai_deployment_primary,
+            model=settings.azure_openai_deployment_id,
             messages=messages,
             tools=TOOL_SCHEMAS,
             tool_choice="auto",

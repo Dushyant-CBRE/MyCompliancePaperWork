@@ -117,7 +117,7 @@ def run_remedial_detection_agent(document_text: str, extracted: object | None = 
     logger.info(
         "Agent 3 (Remedial): analysing %d chars with primary model (%s)",
         len(document_text),
-        settings.azure_openai_deployment_primary,
+        settings.azure_openai_deployment_id,
     )
 
     # Deterministic checks using structured extracted fields (if provided)
@@ -228,19 +228,11 @@ def run_remedial_detection_agent(document_text: str, extracted: object | None = 
         except Exception:
             evidence_block = None
 
-        data = _call_llm(settings.azure_openai_deployment_primary, document_text, evidence_block=evidence_block)
+        data = _call_llm(settings.azure_openai_deployment_id, document_text, evidence_block=evidence_block)
         confidence = float(data.get("classification_confidence", 0))
 
-        # Escalate to fallback model if confidence is too low
-        if confidence < _ESCALATION_THRESHOLD and settings.azure_openai_deployment_fallback:
-            logger.warning(
-                "Agent 3: primary confidence %.1f%% < threshold %.1f%% – escalating to %s",
-                confidence,
-                _ESCALATION_THRESHOLD,
-                settings.azure_openai_deployment_fallback,
-            )
-            data = _call_llm(settings.azure_openai_deployment_fallback, document_text)
-            confidence = float(data.get("classification_confidence", 0))
+        # Note: Single LLM provider, no fallback escalation available
+        # (Previously used fallback model when confidence < threshold)
 
         classification_str = data.get("classification", "UNKNOWN")
         try:

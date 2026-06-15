@@ -1,0 +1,365 @@
+# Field Extraction Configuration
+# ────────────────────────────────────────────────────────────────────────────
+# Defines all fields the LLM should extract from compliance documents.
+# Each field includes: name, type, description, extraction prompt, examples, validation rules.
+
+version: "1.0"
+description: "Configuration for LLM-based field extraction from compliance documents"
+
+# Global extraction settings
+extraction_settings:
+  llm_model: "azure_openai"
+  temperature: 0.2  # Low temperature for consistent extraction
+  max_retries: 2
+  confidence_threshold: 0.7
+
+# Field definitions organized by document type
+document_types:
+  compliance_certificate:
+    description: "PPM Compliance certificates and inspection reports"
+    fields:
+      - name: site_name
+        type: string
+        required: true
+        description: "Name of the facility/site being inspected"
+        extraction_prompt: |
+          Extract the site name, facility name, or location name from the document.
+          Look for labels like "Site Name", "Facility", "Location", "Property Name".
+          Return only the name, no additional context.
+        examples:
+          - "CBRE Manchester - Office Complex"
+          - "London Hospital Site 2"
+          - "Distribution Center North"
+        validation_rules:
+          min_length: 3
+          max_length: 200
+          pattern: null  # Any string
+        fallback_value: null
+        confidence_field: true
+
+      - name: ppm_reference
+        type: string
+        required: true
+        description: "PPM reference number or equipment identifier"
+        extraction_prompt: |
+          Extract the PPM (Planned Preventive Maintenance) reference code or number.
+          Look for patterns like "PPM-XXXX", "reference numbers", "job codes", "equipment ID".
+          The format typically includes letters and numbers.
+          Return the complete reference code.
+        examples:
+          - "PPM-2024-001"
+          - "MAINT-ELV-03"
+          - "GAS-CERT-001"
+        validation_rules:
+          min_length: 4
+          max_length: 50
+          pattern: "^[A-Z0-9\\-]+$"  # Alphanumeric and hyphens
+        fallback_value: null
+        confidence_field: true
+
+      - name: inspection_date
+        type: date
+        required: true
+        description: "Date when the inspection/maintenance was performed"
+        extraction_prompt: |
+          Extract the inspection date, service date, or maintenance date.
+          Look for labels like "Date of Inspection", "Service Date", "Inspection Date", "Completed Date".
+          Return in ISO 8601 format (YYYY-MM-DD).
+        examples:
+          - "2024-06-15"
+          - "2024-03-20"
+          - "2024-01-10"
+        validation_rules:
+          format: "YYYY-MM-DD"
+          not_future: true
+          not_older_than_years: 2
+        fallback_value: null
+        confidence_field: true
+
+      - name: next_service_date
+        type: date
+        required: false
+        description: "Recommended date for next service or maintenance"
+        extraction_prompt: |
+          Extract the next service date, next inspection date, or recommended follow-up date.
+          Look for labels like "Next Service Due", "Next Inspection", "Follow-up Date".
+          Return in ISO 8601 format (YYYY-MM-DD).
+          Return null if not found.
+        examples:
+          - "2024-12-15"
+          - "2025-06-20"
+          - "2024-09-10"
+        validation_rules:
+          format: "YYYY-MM-DD"
+          after: "inspection_date"  # Must be after inspection_date
+        fallback_value: null
+        confidence_field: false
+
+      - name: inspector_name
+        type: string
+        required: true
+        description: "Name of the person who performed the inspection"
+        extraction_prompt: |
+          Extract the name of the engineer, technician, or inspector who performed the work.
+          Look for labels like "Inspected By", "Certified By", "Engineer Name", "Technician".
+          Capture the full name as it appears in the document.
+        examples:
+          - "John Smith"
+          - "Sarah Johnson"
+          - "Michael O'Brien"
+        validation_rules:
+          min_length: 3
+          max_length: 100
+          pattern: null  # Any string
+        fallback_value: "Unknown"
+        confidence_field: true
+
+      - name: vendor_name
+        type: string
+        required: true
+        description: "Name of the maintenance company or vendor"
+        extraction_prompt: |
+          Extract the company name of the vendor or service provider.
+          Look for labels like "Maintenance Company", "Vendor", "Service Provider", "Contractor".
+          Capture the official company name.
+        examples:
+          - "Smith & Associates Engineering"
+          - "UK Elevator Services Ltd"
+          - "Certified Maintenance Corp"
+        validation_rules:
+          min_length: 3
+          max_length: 150
+          pattern: null
+        fallback_value: null
+        confidence_field: true
+
+      - name: client_name
+        type: string
+        required: false
+        description: "Name of the client or asset owner"
+        extraction_prompt: |
+          Extract the client name, asset owner, or company that owns the facility.
+          Look for labels like "Client", "Owner", "Facility Owner", "Client Name".
+          Return null if not found or if it's the same as vendor_name.
+        examples:
+          - "CBRE Corporate"
+          - "Jones & Company"
+          - "Municipal Services"
+        validation_rules:
+          min_length: 3
+          max_length: 150
+          pattern: null
+        fallback_value: null
+        confidence_field: false
+
+      - name: document_type
+        type: string
+        required: true
+        description: "Type of compliance document (e.g., Gas Safety, Electrical, Lift)"
+        extraction_prompt: |
+          Extract the document type or certification type.
+          Look for words like "Gas Safety Certificate", "Electrical Installation Condition Report",
+          "Lift Inspection", "Fire Safety", "Asbestos Report", "Legionella".
+          Return the document category/type.
+        examples:
+          - "Gas Safety Certificate"
+          - "Electrical Installation Condition Report"
+          - "Lift Inspection Certificate"
+          - "Fire Safety Report"
+        validation_rules:
+          min_length: 5
+          max_length: 100
+          enum:
+            - "Gas Safety Certificate"
+            - "Electrical Installation Condition Report"
+            - "Lift Inspection Certificate"
+            - "Fire Safety Report"
+            - "Asbestos Report"
+            - "Legionella Assessment"
+            - "Other"
+        fallback_value: "Other"
+        confidence_field: true
+
+      - name: certificate_number
+        type: string
+        required: false
+        description: "Official certificate or report number"
+        extraction_prompt: |
+          Extract the certificate number, report number, or official reference.
+          Look for labels like "Certificate No.", "Report Number", "Reference Number", "Cert ID".
+          Return the complete number/code as it appears.
+        examples:
+          - "CE2024-00156"
+          - "GSC-2024-001-ABC"
+          - "REC-2024-5432"
+        validation_rules:
+          min_length: 4
+          max_length: 50
+          pattern: null
+        fallback_value: null
+        confidence_field: false
+
+      - name: overall_outcome
+        type: string
+        required: true
+        description: "Overall inspection outcome (Pass/Fail/Remedial)"
+        extraction_prompt: |
+          Extract the overall outcome or conclusion of the inspection.
+          Look for conclusions that state: "PASS", "FAIL", "SATISFACTORY", "UNSATISFACTORY",
+          "COMPLIANT", "NON-COMPLIANT", or "REMEDIAL ACTION REQUIRED".
+          Return the primary outcome status.
+        examples:
+          - "PASS"
+          - "FAIL - Remedial Action Required"
+          - "SATISFACTORY"
+          - "COMPLIANT"
+        validation_rules:
+          min_length: 4
+          max_length: 100
+          enum:
+            - "PASS"
+            - "FAIL"
+            - "REMEDIAL"
+            - "SATISFACTORY"
+            - "UNSATISFACTORY"
+            - "COMPLIANT"
+            - "NON-COMPLIANT"
+        fallback_value: null
+        confidence_field: true
+
+      - name: equipment_id
+        type: string
+        required: false
+        description: "ID of the specific equipment being serviced"
+        extraction_prompt: |
+          Extract the equipment ID, serial number, or asset tag.
+          Look for labels like "Equipment ID", "Serial Number", "Asset Tag", "Unit Number".
+          Return the identifier exactly as it appears.
+        examples:
+          - "SN-12345"
+          - "ASSET-001"
+          - "ELV-SOUTH-01"
+        validation_rules:
+          min_length: 3
+          max_length: 50
+          pattern: null
+        fallback_value: null
+        confidence_field: false
+
+      - name: key_readings
+        type: array
+        required: false
+        description: "Array of key readings/measurements from the inspection"
+        extraction_prompt: |
+          Extract all key readings, measurements, or test results mentioned in the document.
+          For each reading, identify: name (e.g., "Pressure", "Temperature", "Flow Rate"),
+          value, unit (e.g., "PSI", "°C", "L/min"), and status (if mentioned: "PASS", "FAIL", "WARNING").
+          Return as a JSON array of objects with fields: name, value, unit, status.
+        examples:
+          - name: "System Pressure"
+            value: "2.5"
+            unit: "bar"
+            status: "PASS"
+          - name: "Temperature"
+            value: "65"
+            unit: "°C"
+            status: null
+        validation_rules:
+          min_items: 0
+          max_items: 20
+        fallback_value: []
+        confidence_field: false
+
+# Compliance Classification Rules
+compliance_classification:
+  description: "Rules for classifying document compliance status"
+  
+  compliant:
+    patterns:
+      - "pass"
+      - "satisfactory"
+      - "compliant"
+      - "no remedial"
+      - "no action required"
+    keywords_exclude:
+      - "remedial"
+      - "fail"
+      - "unsatisfactory"
+      - "non-compliant"
+    confidence_min: 0.8
+
+  non_compliant:
+    patterns:
+      - "fail"
+      - "unsatisfactory"
+      - "non-compliant"
+      - "urgent"
+    keywords_exclude:
+      - "remedial action"  # remedial is separate
+    confidence_min: 0.8
+
+  remedial:
+    patterns:
+      - "remedial"
+      - "action required"
+      - "defects found"
+      - "issues"
+      - "corrective"
+    keywords_exclude: []
+    confidence_min: 0.75
+
+# Remedial Actions Detection
+remedial_detection:
+  description: "Configuration for detecting remedial/corrective actions"
+  
+  prompts:
+    detect_remedial: |
+      Analyze the compliance document and identify:
+      1. Whether any remedial actions or corrective measures are required
+      2. If yes, list the specific remedial actions (defects, issues, required corrections)
+      3. Urgency level: "URGENT", "HIGH", "MEDIUM", "LOW"
+      4. Recommended timeline for remediation
+      
+      Return a JSON object:
+      {
+        "has_remedial": boolean,
+        "remedial_items": [
+          {
+            "issue": "description of the issue",
+            "action_required": "what needs to be done",
+            "urgency": "URGENT|HIGH|MEDIUM|LOW",
+            "timeline_days": integer
+          }
+        ],
+        "overall_urgency": "URGENT|HIGH|MEDIUM|LOW"
+      }
+  
+  urgency_levels:
+    URGENT:
+      max_days: 7
+      color: "red"
+    HIGH:
+      max_days: 30
+      color: "orange"
+    MEDIUM:
+      max_days: 90
+      color: "yellow"
+    LOW:
+      max_days: 180
+      color: "green"
+
+# Validation Rules
+validation:
+  description: "General validation rules for all documents"
+  
+  cross_field_checks:
+    - check_dates: "inspection_date must be before or equal to next_service_date"
+    - check_names: "vendor_name should not be empty"
+    - check_type: "document_type must be one of the defined enum values"
+  
+  confidence_aggregation:
+    method: "weighted_average"
+    weights:
+      required_fields: 0.6
+      optional_fields: 0.2
+      overall_consistency: 0.2
